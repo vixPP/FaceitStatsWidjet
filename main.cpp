@@ -14,5 +14,6 @@ int main(int argc, char *argv[])
     w.move(1550, 520);
 
     w.show();
+
     return a.exec();
 }
