@@ -1,6 +1,7 @@
 #ifndef MAINWINDOW_H
 #define MAINWINDOW_H
 
+#include "qlabel.h"
 #include <QMainWindow>
 #include <QNetworkAccessManager>
 #include <QNetworkReply>
@@ -16,6 +17,7 @@ class MainWindow : public QMainWindow
 public:
     MainWindow(QWidget *parent = nullptr);
     ~MainWindow();
+    void applyRoundedCorners();
 
 private slots:
     void onFetchStatsClicked();
@@ -27,6 +29,8 @@ private:
     QNetworkAccessManager *networkManager;
     QString currentPlayerId;
     QString apiKey = "7334b675-bf37-41a3-9f37-df39acb05fba"; // Перенесено в поле класса
+    QLabel *avatarLabel;
+    QLabel *text_KR;
 };
 #endif // MAINWINDOW_H
 
