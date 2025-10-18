@@ -13,6 +13,11 @@
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
     , ui(new Ui::MainWindow)
+    , totalKills(0)
+    , totalDeaths(0)
+    , totalADR(0.0) // Инициализация
+    , matchesCount(0)
+    , processedMatches(0)
 {
     ui->setupUi(this);
 
@@ -26,6 +31,10 @@ MainWindow::MainWindow(QWidget *parent)
     connect(networkManager, &QNetworkAccessManager::finished, this, &MainWindow::onRequestFinished);
     connect(statsNetworkManager, &QNetworkAccessManager::finished, this, &MainWindow::onMatchHistoryFinished);
     connect(avatarNetworkManager, &QNetworkAccessManager::finished, this, &MainWindow::onAvatarDownloaded);
+    historyNetworkManager = new QNetworkAccessManager(this);
+    connect(historyNetworkManager, &QNetworkAccessManager::finished, this, &MainWindow::onMatchHistoryFetched);
+    matchStatsNetworkManager = new QNetworkAccessManager(this);
+    connect(matchStatsNetworkManager, &QNetworkAccessManager::finished, this, &MainWindow::onMatchStatsFetched);
 
     avatarLabel = ui->label_avatar;
     applyRoundedCorners();
@@ -89,13 +98,16 @@ void MainWindow::onRequestFinished(QNetworkReply *reply)
     ui->label_NAME->setText(jsonObj["nickname"].toString());
 
     // ELO
-    if (jsonObj.contains("games") && jsonObj["games"].isObject()) {
+    if (jsonObj.contains("games") && jsonObj["games"].isObject())
+    {
         QJsonObject games = jsonObj["games"].toObject();
-        if (games.contains("cs2") && games["cs2"].isObject()) {
+        if (games.contains("cs2") && games["cs2"].isObject())
+        {
             QJsonObject cs2 = games["cs2"].toObject();
-            if (cs2.contains("faceit_elo")) {
+            if (cs2.contains("faceit_elo"))
+            {
                 int elo = cs2["faceit_elo"].toInt();
-                ui->text_elo->setText(QString("ELO: %1").arg(elo));
+                ui->text_elo->setText(QString("ELO:      %1").arg(elo));
             }
         }
     }
@@ -114,11 +126,20 @@ void MainWindow::onRequestFinished(QNetworkReply *reply)
     statsRequest.setUrl(QUrl(statsUrl));
     statsRequest.setRawHeader("Authorization", QString("Bearer %1").arg(apiKey).toUtf8());
     statsNetworkManager->get(statsRequest);
+
+    QString matchHistoryUrl = QString("https://open.faceit.com/data/v4/players/%1/history?game=cs2&offset=0&limit=10").arg(playerId);
+    QNetworkRequest matchHistoryRequest;
+    matchHistoryRequest.setUrl(QUrl(matchHistoryUrl));
+    matchHistoryRequest.setRawHeader("Authorization", QString("Bearer %1").arg(apiKey).toUtf8());
+    matchHistoryRequest.setRawHeader("Accept", "application/json");
+    matchHistoryRequest.setRawHeader("User-Agent", "MyApp/1.0");
+    historyNetworkManager->get(matchHistoryRequest);
 }
 
 void MainWindow::onMatchHistoryFinished(QNetworkReply *reply)
 {
-    if (reply->error() != QNetworkReply::NoError) {
+    if (reply->error() != QNetworkReply::NoError)
+    {
         ui->text_KD->setText("Ошибка: " + reply->errorString());
         reply->deleteLater();
         return;
@@ -128,52 +149,211 @@ void MainWindow::onMatchHistoryFinished(QNetworkReply *reply)
     reply->deleteLater();
 
     QJsonDocument jsonDoc = QJsonDocument::fromJson(responseData);
-    if (jsonDoc.isNull() || !jsonDoc.isObject()) {
+    if (jsonDoc.isNull() || !jsonDoc.isObject())
+    {
         ui->text_KD->setText("Ошибка: некорректный JSON.");
         return;
     }
 
     QJsonObject root = jsonDoc.object();
-    if (root.contains("lifetime") && root["lifetime"].isObject()) {
+    if (root.contains("lifetime") && root["lifetime"].isObject())
+    {
         QJsonObject lifetime = root["lifetime"].toObject();
 
         // ADR
-        if (lifetime.contains("ADR")) {
+        if (lifetime.contains("ADR"))
+        {
             double adr = lifetime["ADR"].toString().toDouble();
-            ui->text_KR->setText(QString("ADR: %1").arg(adr, 0, 'f', 2));
+            ui->text_KR->setText(QString("ADR:      %1").arg(adr, 0, 'f', 2));
         }
 
         // K/D Ratio
-        if (lifetime.contains("Average K/D Ratio")) {
+        if (lifetime.contains("Average K/D Ratio"))
+        {
             double kdRatio = lifetime["Average K/D Ratio"].toString().toDouble();
-            ui->text_KD->setText(QString("KD: %1").arg(kdRatio, 0, 'f', 2));
+            ui->text_KD->setText(QString("KD:       %1").arg(kdRatio, 0, 'f', 2));
         }
 
         // Matches
-        if (lifetime.contains("Matches")) {
+        if (lifetime.contains("Matches"))
+        {
             int matches = lifetime["Matches"].toString().toInt();
-            ui->text_Matches->setText(QString("Matches: %1").arg(matches));
+            ui->text_Matches->setText(QString("Matches:  %1").arg(matches));
         }
     }
 }
 
+
+void MainWindow::onMatchHistoryFetched(QNetworkReply *reply)
+{
+    totalKills = 0;  // Сброс счётчиков
+    matchesCount = 0;
+    totalDeaths = 0;
+    processedMatches = 0;
+    totalADR = 0;
+
+    if (reply->error() != QNetworkReply::NoError)
+    {
+        ui->text_AVG_LastMatches->setText("Ошибка: " + reply->errorString());
+        reply->deleteLater();
+        return;
+    }
+
+
+    QByteArray responseData = reply->readAll();
+
+    reply->deleteLater();
+
+    QJsonDocument jsonDoc = QJsonDocument::fromJson(responseData);
+    if (jsonDoc.isNull() || !jsonDoc.isObject())
+    {
+        qDebug().noquote() << jsonDoc.toJson(QJsonDocument::Indented);
+         QJsonDocument jsonDoc = QJsonDocument::fromJson(responseData);
+        ui->text_AVG_LastMatches->setText("Ошибка: некорректный JSON.");
+        return;
+    }
+
+
+    QJsonObject root = jsonDoc.object();
+    if (root.contains("items") && root["items"].isArray())
+    {
+        QJsonArray matches = root["items"].toArray();
+        for (const QJsonValue &matchValue : matches)
+        {
+            if (!matchValue.isObject()) continue;
+            QJsonObject match = matchValue.toObject();
+            QString matchId = match["match_id"].toString();
+            if (!matchId.isEmpty())
+            {
+                // Запрашиваем статистику матча
+                QString matchStatsUrl = QString("https://open.faceit.com/data/v4/matches/%1/stats").arg(matchId);
+                QNetworkRequest matchStatsRequest;
+                matchStatsRequest.setUrl(QUrl(matchStatsUrl));
+                matchStatsRequest.setRawHeader("Authorization", QString("Bearer %1").arg(apiKey).toUtf8());
+                matchStatsNetworkManager->get(matchStatsRequest);
+            }
+        }
+    }
+}
+
+
+void MainWindow::onMatchStatsFetched(QNetworkReply *reply)
+{
+    if (reply->error() != QNetworkReply::NoError)
+    {
+        qDebug() << "Ошибка запроса статистики матча:" << reply->errorString();
+        reply->deleteLater();
+        return;
+    }
+
+    QByteArray responseData = reply->readAll();
+    reply->deleteLater();
+
+    QJsonDocument jsonDoc = QJsonDocument::fromJson(responseData);
+    if (jsonDoc.isNull() || !jsonDoc.isObject())
+    {
+        qDebug() << "Ошибка разбора JSON статистики матча.";
+        return;
+    }
+
+    QJsonObject root = jsonDoc.object();
+    if (root.contains("rounds") && root["rounds"].isArray())
+    {
+        QJsonArray rounds = root["rounds"].toArray();
+        for (const QJsonValue &roundValue : rounds)
+        {
+            if (!roundValue.isObject()) continue;
+            QJsonObject round = roundValue.toObject();
+            if (round.contains("teams") && round["teams"].isArray())
+            {
+                QJsonArray teams = round["teams"].toArray();
+                for (const QJsonValue &teamValue : teams)
+                {
+                    if (!teamValue.isObject()) continue;
+                    QJsonObject team = teamValue.toObject();
+                    if (team.contains("players") && team["players"].isArray())
+                    {
+                        QJsonArray players = team["players"].toArray();
+                        for (const QJsonValue &playerValue : players)
+                        {
+                            if (!playerValue.isObject()) continue;
+                            QJsonObject player = playerValue.toObject();
+                            if (player["player_id"].toString() == currentPlayerId)
+                            {
+                                if (player.contains("player_stats") && player["player_stats"].isObject())
+                                {
+                                    QJsonObject stats = player["player_stats"].toObject();
+                                    if (stats.contains("Kills"))
+                                    {
+                                        // Преобразуем строку в число
+                                        int kills = stats["Kills"].toString().toInt();
+                                        totalKills += kills;
+                                        matchesCount++;
+                                        qDebug() << "Match Kills:" << kills
+                                                 << "Match deathes" << totalDeaths
+                                                 << "Total Kills:" << totalKills
+                                                 << "Matches Count:" << matchesCount;
+                                    }
+                                    if (stats.contains("Deaths"))
+                                    {
+                                        int deaths = stats["Deaths"].toString().toInt();
+                                        totalDeaths += deaths;
+                                    }
+                                    if (stats.contains("ADR"))
+                                    {
+                                                   double adr = stats["ADR"].toString().toDouble();
+                                                   totalADR += adr;
+                                                   qDebug() << "Match ADR:" << adr << "Total ADR:" << totalADR;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    processedMatches++;
+    if (processedMatches == 10) {
+        if (matchesCount > 0) {
+            double averageKills = static_cast<double>(totalKills) / matchesCount;
+            ui->text_AVG_LastMatches->setText(QString("AVG.K     %1").arg(averageKills, 0, 'f', 2));
+
+            double kdRatio = (totalDeaths == 0) ? totalKills : static_cast<double>(totalKills) / totalDeaths;
+            ui->text_KD_LastMatches->setText(QString("KD        %1").arg(kdRatio, 0, 'f', 2));
+
+            double averageADR = totalADR / matchesCount;
+            ui->text_ADR_LastMatches->setText(QString("ADR       %1").arg(averageADR, 0, 'f', 2));
+        } else
+        {
+            ui->text_AVG_LastMatches->setText("Нет данных о матчах.");
+        }
+    }
+}
+
+
+
 void MainWindow::onAvatarDownloaded(QNetworkReply *reply)
 {
-    if (reply->error() != QNetworkReply::NoError) {
+    if (reply->error() != QNetworkReply::NoError)
+    {
         qDebug() << "Ошибка загрузки аватара:" << reply->errorString();
         reply->deleteLater();
         return;
     }
 
     QByteArray avatarData = reply->readAll();
-    if (avatarData.isEmpty()) {
+    if (avatarData.isEmpty())
+    {
         qDebug() << "Avatar data is empty!";
         reply->deleteLater();
         return;
     }
 
     QPixmap avatarPixmap;
-    if (!avatarPixmap.loadFromData(avatarData)) {
+    if (!avatarPixmap.loadFromData(avatarData))
+    {
         qDebug() << "Не удалось загрузить аватар!";
         reply->deleteLater();
         return;

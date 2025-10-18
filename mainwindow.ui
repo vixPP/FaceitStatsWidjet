@@ -6,8 +6,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>351</width>
-    <height>459</height>
+    <width>372</width>
+    <height>479</height>
    </rect>
   </property>
   <property name="font">
@@ -75,14 +75,20 @@
 background-color: #3c403d;
 }</string>
     </property>
+    <property name="text">
+     <string/>
+    </property>
+    <property name="placeholderText">
+     <string>Enter nickname</string>
+    </property>
    </widget>
    <widget class="QFrame" name="frame_2">
     <property name="geometry">
      <rect>
-      <x>160</x>
-      <y>70</y>
+      <x>10</x>
+      <y>200</y>
       <width>171</width>
-      <height>241</height>
+      <height>201</height>
      </rect>
     </property>
     <property name="styleSheet">
@@ -125,7 +131,7 @@ color: rgb(214, 214, 214);
 </string>
      </property>
      <property name="text">
-      <string> All time </string>
+      <string>   All time </string>
      </property>
     </widget>
     <widget class="QLabel" name="text_elo">
@@ -153,7 +159,7 @@ color: rgb(214, 214, 214);
 </string>
      </property>
      <property name="text">
-      <string>ELO       1923</string>
+      <string>ELO        1923</string>
      </property>
     </widget>
     <widget class="QLabel" name="text_KD">
@@ -181,7 +187,7 @@ color: rgb(214, 214, 214);
 </string>
      </property>
      <property name="text">
-      <string>KD        1.09</string>
+      <string>KD         1.09</string>
      </property>
     </widget>
     <widget class="QLabel" name="text_KR">
@@ -209,7 +215,7 @@ color: rgb(214, 214, 214);
 </string>
      </property>
      <property name="text">
-      <string>ADR       74.54</string>
+      <string>ADR        74.54</string>
      </property>
     </widget>
     <widget class="QLabel" name="text_Matches">
@@ -243,87 +249,15 @@ color: rgb(214, 214, 214);
 </string>
      </property>
      <property name="text">
-      <string>Matches   1000</string>
+      <string>Matches    1000</string>
      </property>
     </widget>
-    <widget class="QLabel" name="text_Matches_2">
-     <property name="geometry">
-      <rect>
-       <x>0</x>
-       <y>200</y>
-       <width>171</width>
-       <height>41</height>
-      </rect>
-     </property>
-     <property name="sizePolicy">
-      <sizepolicy hsizetype="Preferred" vsizetype="Preferred">
-       <horstretch>0</horstretch>
-       <verstretch>0</verstretch>
-      </sizepolicy>
-     </property>
-     <property name="font">
-      <font>
-       <family>Courier</family>
-       <pointsize>11</pointsize>
-       <bold>true</bold>
-      </font>
-     </property>
-     <property name="styleSheet">
-      <string notr="true">QLabel
-
-{
-color: rgb(214, 214, 214);
-}
-</string>
-     </property>
-     <property name="text">
-      <string>AVG.Kills 18</string>
-     </property>
-    </widget>
-   </widget>
-   <widget class="QLabel" name="label_registration_date">
-    <property name="geometry">
-     <rect>
-      <x>50</x>
-      <y>250</y>
-      <width>20</width>
-      <height>20</height>
-     </rect>
-    </property>
-    <property name="text">
-     <string>TextLabel</string>
-    </property>
-   </widget>
-   <widget class="QFrame" name="frame">
-    <property name="geometry">
-     <rect>
-      <x>200</x>
-      <y>340</y>
-      <width>91</width>
-      <height>91</height>
-     </rect>
-    </property>
-    <property name="styleSheet">
-     <string notr="true">QFrame
-{
-background-color: #2e2e2d;
-          border: 2px solid #333;
-           border-radius: 5px;
-           padding: 10px;
-}  </string>
-    </property>
-    <property name="frameShape">
-     <enum>QFrame::StyledPanel</enum>
-    </property>
-    <property name="frameShadow">
-     <enum>QFrame::Raised</enum>
-    </property>
    </widget>
    <widget class="QLabel" name="label_NAME">
     <property name="geometry">
      <rect>
-      <x>30</x>
-      <y>150</y>
+      <x>10</x>
+      <y>140</y>
       <width>71</width>
       <height>41</height>
      </rect>
@@ -352,8 +286,8 @@ color: rgb(214, 214, 214);
    <widget class="QLabel" name="label_avatar">
     <property name="geometry">
      <rect>
-      <x>30</x>
-      <y>80</y>
+      <x>10</x>
+      <y>70</y>
       <width>71</width>
       <height>71</height>
      </rect>
@@ -371,13 +305,298 @@ background-color: #2e2e2d;
      <string/>
     </property>
    </widget>
+   <widget class="QFrame" name="frame_3">
+    <property name="geometry">
+     <rect>
+      <x>190</x>
+      <y>200</y>
+      <width>171</width>
+      <height>201</height>
+     </rect>
+    </property>
+    <property name="styleSheet">
+     <string notr="true">QFrame
+{
+background-color: #2e2e2d;
+          border: 2px solid #333;
+           border-radius: 5px;
+           padding: 10px;
+}  </string>
+    </property>
+    <property name="frameShape">
+     <enum>QFrame::StyledPanel</enum>
+    </property>
+    <property name="frameShadow">
+     <enum>QFrame::Raised</enum>
+    </property>
+    <widget class="QLabel" name="label_2">
+     <property name="geometry">
+      <rect>
+       <x>0</x>
+       <y>0</y>
+       <width>171</width>
+       <height>41</height>
+      </rect>
+     </property>
+     <property name="font">
+      <font>
+       <family>Courier</family>
+       <pointsize>12</pointsize>
+       <bold>true</bold>
+      </font>
+     </property>
+     <property name="styleSheet">
+      <string notr="true">QLabel
+
+{
+color: rgb(214, 214, 214);
+}
+</string>
+     </property>
+     <property name="text">
+      <string/>
+     </property>
+    </widget>
+    <widget class="QLabel" name="text_KD_LastMatches">
+     <property name="geometry">
+      <rect>
+       <x>0</x>
+       <y>80</y>
+       <width>171</width>
+       <height>41</height>
+      </rect>
+     </property>
+     <property name="font">
+      <font>
+       <family>Courier</family>
+       <pointsize>11</pointsize>
+       <bold>true</bold>
+      </font>
+     </property>
+     <property name="styleSheet">
+      <string notr="true">QLabel
+
+{
+color: rgb(214, 214, 214);
+}
+</string>
+     </property>
+     <property name="text">
+      <string>KD        1.3</string>
+     </property>
+    </widget>
+    <widget class="QLabel" name="text_ADR_LastMatches">
+     <property name="geometry">
+      <rect>
+       <x>0</x>
+       <y>160</y>
+       <width>171</width>
+       <height>41</height>
+      </rect>
+     </property>
+     <property name="font">
+      <font>
+       <family>Courier</family>
+       <pointsize>11</pointsize>
+       <bold>true</bold>
+      </font>
+     </property>
+     <property name="styleSheet">
+      <string notr="true">QLabel
+
+{
+color: rgb(214, 214, 214);
+}
+</string>
+     </property>
+     <property name="text">
+      <string>ADR       90.10</string>
+     </property>
+    </widget>
+    <widget class="QLabel" name="text_AVG_LastMatches">
+     <property name="geometry">
+      <rect>
+       <x>0</x>
+       <y>120</y>
+       <width>171</width>
+       <height>41</height>
+      </rect>
+     </property>
+     <property name="sizePolicy">
+      <sizepolicy hsizetype="Preferred" vsizetype="Preferred">
+       <horstretch>0</horstretch>
+       <verstretch>0</verstretch>
+      </sizepolicy>
+     </property>
+     <property name="font">
+      <font>
+       <family>Courier</family>
+       <pointsize>11</pointsize>
+       <bold>true</bold>
+      </font>
+     </property>
+     <property name="styleSheet">
+      <string notr="true">QLabel
+
+{
+color: rgb(214, 214, 214);
+}
+</string>
+     </property>
+     <property name="text">
+      <string>AVG.K     18</string>
+     </property>
+    </widget>
+    <widget class="QLabel" name="text_ELO_Change">
+     <property name="geometry">
+      <rect>
+       <x>0</x>
+       <y>40</y>
+       <width>171</width>
+       <height>41</height>
+      </rect>
+     </property>
+     <property name="font">
+      <font>
+       <family>Courier</family>
+       <pointsize>11</pointsize>
+       <bold>true</bold>
+      </font>
+     </property>
+     <property name="styleSheet">
+      <string notr="true">QLabel
+
+{
+color: rgb(214, 214, 214);
+}
+</string>
+     </property>
+     <property name="text">
+      <string>ELO       +122</string>
+     </property>
+    </widget>
+   </widget>
+   <widget class="QPushButton" name="pushButton_2">
+    <property name="geometry">
+     <rect>
+      <x>290</x>
+      <y>120</y>
+      <width>80</width>
+      <height>19</height>
+     </rect>
+    </property>
+    <property name="text">
+     <string>LAST 10 MATCHES</string>
+    </property>
+   </widget>
+   <widget class="QPushButton" name="pushButton_3">
+    <property name="geometry">
+     <rect>
+      <x>290</x>
+      <y>150</y>
+      <width>80</width>
+      <height>19</height>
+     </rect>
+    </property>
+    <property name="text">
+     <string>LAST 30 MATCHES</string>
+    </property>
+   </widget>
+   <widget class="QFrame" name="frame_4">
+    <property name="geometry">
+     <rect>
+      <x>90</x>
+      <y>70</y>
+      <width>191</width>
+      <height>111</height>
+     </rect>
+    </property>
+    <property name="styleSheet">
+     <string notr="true">QFrame
+{
+background-color: #2e2e2d;
+          border: 2px solid #333;
+           border-radius: 5px;
+           padding: 10px;
+}  </string>
+    </property>
+    <property name="frameShape">
+     <enum>QFrame::StyledPanel</enum>
+    </property>
+    <property name="frameShadow">
+     <enum>QFrame::Raised</enum>
+    </property>
+    <widget class="QFrame" name="frame_5">
+     <property name="geometry">
+      <rect>
+       <x>0</x>
+       <y>0</y>
+       <width>191</width>
+       <height>31</height>
+      </rect>
+     </property>
+     <property name="styleSheet">
+      <string notr="true">QFrame
+{
+background-color: #2e2e2d;
+          border: 2px solid #333;
+           border-radius: 5px;
+           padding: 10px;
+}  </string>
+     </property>
+     <property name="frameShape">
+      <enum>QFrame::StyledPanel</enum>
+     </property>
+     <property name="frameShadow">
+      <enum>QFrame::Raised</enum>
+     </property>
+    </widget>
+    <widget class="QFrame" name="frame_6">
+     <property name="geometry">
+      <rect>
+       <x>0</x>
+       <y>80</y>
+       <width>191</width>
+       <height>31</height>
+      </rect>
+     </property>
+     <property name="styleSheet">
+      <string notr="true">QFrame
+{
+background-color: #2e2e2d;
+          border: 2px solid #333;
+           border-radius: 5px;
+           padding: 10px;
+}  </string>
+     </property>
+     <property name="frameShape">
+      <enum>QFrame::StyledPanel</enum>
+     </property>
+     <property name="frameShadow">
+      <enum>QFrame::Raised</enum>
+     </property>
+    </widget>
+   </widget>
+   <widget class="QToolButton" name="toolButton">
+    <property name="geometry">
+     <rect>
+      <x>290</x>
+      <y>80</y>
+      <width>71</width>
+      <height>31</height>
+     </rect>
+    </property>
+    <property name="text">
+     <string>...</string>
+    </property>
+   </widget>
   </widget>
   <widget class="QMenuBar" name="menubar">
    <property name="geometry">
     <rect>
      <x>0</x>
      <y>0</y>
-     <width>351</width>
+     <width>372</width>
      <height>21</height>
     </rect>
    </property>

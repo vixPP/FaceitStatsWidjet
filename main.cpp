@@ -10,8 +10,8 @@ int main(int argc, char *argv[])
     w.setWindowFlags(Qt::FramelessWindowHint);
     w.setAttribute(Qt::WA_TranslucentBackground);
     //w.setStyleSheet("background-color: rgba(40, 40, 40, 250);");
-    w.setFixedSize(350, 500);
-    w.move(1550, 520);
+    w.setFixedSize(375, 500);
+    w.move(1525, 520);
 
     w.show();
 
