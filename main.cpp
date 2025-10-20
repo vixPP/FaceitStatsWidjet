@@ -11,7 +11,7 @@ int main(int argc, char *argv[])
     w.setAttribute(Qt::WA_TranslucentBackground);
     //w.setStyleSheet("background-color: rgba(40, 40, 40, 250);");
     w.setFixedSize(375, 500);
-    w.move(1525, 520);
+    w.move(1545, 540);
 
     w.show();
 

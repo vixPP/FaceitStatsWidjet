@@ -20,17 +20,19 @@ MainWindow::MainWindow(QWidget *parent)
     , processedMatches(0)
 {
     ui->setupUi(this);
-
+    bestMapImageLabel = ui->label_BestMapImage;
     // Инициализация сетевых менеджеров
     networkManager = new QNetworkAccessManager(this);
     statsNetworkManager = new QNetworkAccessManager(this);
     avatarNetworkManager = new QNetworkAccessManager(this);
+    bestMapImageNetworkManager = new QNetworkAccessManager(this);
 
     // Подключение сигналов
     connect(ui->pushButton, &QPushButton::clicked, this, &MainWindow::onFetchStatsClicked);
     connect(networkManager, &QNetworkAccessManager::finished, this, &MainWindow::onRequestFinished);
     connect(statsNetworkManager, &QNetworkAccessManager::finished, this, &MainWindow::onMatchHistoryFinished);
     connect(avatarNetworkManager, &QNetworkAccessManager::finished, this, &MainWindow::onAvatarDownloaded);
+    connect(bestMapImageNetworkManager, &QNetworkAccessManager::finished, this, &MainWindow::onBestMapImageDownloaded);
     historyNetworkManager = new QNetworkAccessManager(this);
     connect(historyNetworkManager, &QNetworkAccessManager::finished, this, &MainWindow::onMatchHistoryFetched);
     matchStatsNetworkManager = new QNetworkAccessManager(this);
@@ -48,7 +50,8 @@ MainWindow::~MainWindow()
 void MainWindow::onFetchStatsClicked()
 {
     QString nickname = ui->lineEditIRL->text().trimmed();
-    if (nickname.isEmpty()) {
+    if (nickname.isEmpty())
+    {
         return;
     }
 
@@ -71,7 +74,8 @@ void MainWindow::onRequestFinished(QNetworkReply *reply)
 {
     ui->pushButton->setEnabled(true);
 
-    if (reply->error() != QNetworkReply::NoError) {
+    if (reply->error() != QNetworkReply::NoError)
+    {
         ui->label_NAME->setText("Ошибка");
         ui->text_elo->setText("Ошибка: " + reply->errorString());
         reply->deleteLater();
@@ -79,17 +83,20 @@ void MainWindow::onRequestFinished(QNetworkReply *reply)
     }
 
     QByteArray responseData = reply->readAll();
+    //qDebug().noquote() << "Player Info JSON:" << QString(responseData); //JSON otvet
     reply->deleteLater();
 
     QJsonDocument jsonDoc = QJsonDocument::fromJson(responseData);
-    if (jsonDoc.isNull() || !jsonDoc.isObject()) {
+    if (jsonDoc.isNull() || !jsonDoc.isObject())
+    {
         ui->text_elo->setText("Ошибка: некорректный JSON.");
         return;
     }
 
     QJsonObject jsonObj = jsonDoc.object();
     QString playerId = jsonObj["player_id"].toString();
-    if (playerId.isEmpty()) {
+    if (playerId.isEmpty())
+    {
         ui->text_elo->setText("Игрок не найден.");
         return;
     }
@@ -114,7 +121,8 @@ void MainWindow::onRequestFinished(QNetworkReply *reply)
 
     // Аватар
     QString avatarUrl = jsonObj["avatar"].toString();
-    if (!avatarUrl.isEmpty()) {
+    if (!avatarUrl.isEmpty())
+    {
         QNetworkRequest avatarRequest;
         avatarRequest.setUrl(QUrl(avatarUrl));
         avatarNetworkManager->get(avatarRequest);
@@ -144,37 +152,89 @@ void MainWindow::onMatchHistoryFinished(QNetworkReply *reply)
         reply->deleteLater();
         return;
     }
-
     QByteArray responseData = reply->readAll();
+    qDebug().noquote() <<  "Player Stats JSON:" << QString(responseData);
     reply->deleteLater();
-
     QJsonDocument jsonDoc = QJsonDocument::fromJson(responseData);
     if (jsonDoc.isNull() || !jsonDoc.isObject())
     {
         ui->text_KD->setText("Ошибка: некорректный JSON.");
         return;
     }
-
     QJsonObject root = jsonDoc.object();
+
+    // Обработка статистики по картам
+    if (root.contains("segments") && root["segments"].isArray())
+    {
+        QJsonArray segments = root["segments"].toArray();
+        QString bestMap;
+        double bestKDRatio = 0.0;
+        QString bestMapImageUrl;
+        double AVGK = 0.0;
+        int TotalMatches = 0;
+        double winRate = 0.0;
+
+        for (const QJsonValue &segmentValue : segments)
+        {
+            if (!segmentValue.isObject()) continue;
+            QJsonObject segment = segmentValue.toObject();
+            if (segment["type"].toString() == "Map" && segment.contains("stats"))
+            {
+                QJsonObject stats = segment["stats"].toObject();
+
+
+                if (stats.contains("Average K/D Ratio"))
+                {
+                    double kdRatio = stats["Average K/D Ratio"].toString().toDouble();
+
+
+                    if (kdRatio > bestKDRatio)
+                    {
+                        bestKDRatio = kdRatio;
+                        bestMap = segment["label"].toString();
+                        bestMapImageUrl = segment["img_regular"].toString();
+                        AVGK = stats["Average Kills"].toString().toDouble();
+                        TotalMatches = stats["Total Matches"].toString().toInt();
+                        winRate = stats["Win Rate %"].toString().toDouble();
+                    }
+
+                }
+
+            }
+        }
+
+        if (!bestMap.isEmpty())
+        {
+
+            ui->text_BestMapName->setText(QString("%1").arg(bestMap));
+            ui->Text_KD_BestMap->setText(QString("KD:      %2").arg(bestKDRatio, 0, 'f', 2));
+            ui->Text_AVGK_BestMap->setText(QString("AVG.K:   %1").arg(AVGK, 0, 'f', 1));
+            ui->TotalOnBestMapMatches->setText(QString("Matches: %1").arg(TotalMatches));
+            ui->Text_WInRate_BestMap->setText(QString("W.Rate:  %1").arg(winRate));
+
+            if (!bestMapImageUrl.isEmpty())
+            {
+                QNetworkRequest imageRequest;
+                imageRequest.setUrl(QUrl(bestMapImageUrl));
+                bestMapImageNetworkManager->get(imageRequest);
+            }
+        }
+    }
+
+    // Остальная логика обработки статистики
     if (root.contains("lifetime") && root["lifetime"].isObject())
     {
         QJsonObject lifetime = root["lifetime"].toObject();
-
-        // ADR
         if (lifetime.contains("ADR"))
         {
             double adr = lifetime["ADR"].toString().toDouble();
             ui->text_KR->setText(QString("ADR:      %1").arg(adr, 0, 'f', 2));
         }
-
-        // K/D Ratio
         if (lifetime.contains("Average K/D Ratio"))
         {
             double kdRatio = lifetime["Average K/D Ratio"].toString().toDouble();
             ui->text_KD->setText(QString("KD:       %1").arg(kdRatio, 0, 'f', 2));
         }
-
-        // Matches
         if (lifetime.contains("Matches"))
         {
             int matches = lifetime["Matches"].toString().toInt();
@@ -182,6 +242,7 @@ void MainWindow::onMatchHistoryFinished(QNetworkReply *reply)
         }
     }
 }
+
 
 
 void MainWindow::onMatchHistoryFetched(QNetworkReply *reply)
@@ -199,16 +260,13 @@ void MainWindow::onMatchHistoryFetched(QNetworkReply *reply)
         return;
     }
 
-
     QByteArray responseData = reply->readAll();
-
     reply->deleteLater();
 
     QJsonDocument jsonDoc = QJsonDocument::fromJson(responseData);
     if (jsonDoc.isNull() || !jsonDoc.isObject())
     {
-        qDebug().noquote() << jsonDoc.toJson(QJsonDocument::Indented);
-         QJsonDocument jsonDoc = QJsonDocument::fromJson(responseData);
+        qDebug().noquote() << jsonDoc.toJson(QJsonDocument::Indented); 
         ui->text_AVG_LastMatches->setText("Ошибка: некорректный JSON.");
         return;
     }
@@ -332,8 +390,6 @@ void MainWindow::onMatchStatsFetched(QNetworkReply *reply)
     }
 }
 
-
-
 void MainWindow::onAvatarDownloaded(QNetworkReply *reply)
 {
     if (reply->error() != QNetworkReply::NoError)
@@ -363,6 +419,36 @@ void MainWindow::onAvatarDownloaded(QNetworkReply *reply)
     avatarLabel->setPixmap(avatarPixmap);
     reply->deleteLater();
 }
+
+
+void MainWindow::onBestMapImageDownloaded(QNetworkReply *reply)
+{
+    if (reply->error() != QNetworkReply::NoError)
+    {
+        qDebug() << "Ошибка загрузки изображения карты:" << reply->errorString();
+        reply->deleteLater();
+        return;
+    }
+    QByteArray imageData = reply->readAll();
+    if (imageData.isEmpty())
+    {
+        qDebug() << "Image data is empty!";
+        reply->deleteLater();
+        return;
+    }
+    QPixmap mapPixmap;
+    if (!mapPixmap.loadFromData(imageData))
+    {
+        qDebug() << "Не удалось загрузить изображение карты!";
+        reply->deleteLater();
+        return;
+    }
+    mapPixmap = mapPixmap.scaled(91, 61, Qt::IgnoreAspectRatio, Qt::SmoothTransformation);
+    bestMapImageLabel->setPixmap(mapPixmap);
+    reply->deleteLater();
+}
+
+
 
 void MainWindow::applyRoundedCorners()
 {

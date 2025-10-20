@@ -10,6 +10,14 @@ QT_BEGIN_NAMESPACE
 namespace Ui { class MainWindow; }
 QT_END_NAMESPACE
 
+struct MapStats
+{
+    QString mapName;
+    int kills = 0;
+    int deaths = 0;
+    double kdRatio = 0.0;
+};
+
 class MainWindow : public QMainWindow
 {
     Q_OBJECT
@@ -26,6 +34,8 @@ private slots:
     void onAvatarDownloaded(QNetworkReply *reply);
     void onMatchHistoryFetched(QNetworkReply *reply);
     void onMatchStatsFetched(QNetworkReply *reply);
+    void onBestMapImageDownloaded(QNetworkReply *reply);
+
 private:
     Ui::MainWindow *ui;
     QNetworkAccessManager *networkManager;
@@ -33,16 +43,19 @@ private:
     QNetworkAccessManager *statsNetworkManager;
     QNetworkAccessManager *historyNetworkManager;
     QNetworkAccessManager *matchStatsNetworkManager;
+    QNetworkAccessManager* bestMapImageNetworkManager;
     QString currentPlayerId;
     QString apiKey = "7334b675-bf37-41a3-9f37-df39acb05fba"; // Перенесено в поле класса
     QLabel *avatarLabel;
     QLabel *text_KR;
+    QLabel *bestMapImageLabel;
 
     int totalKills = 0;
     int matchesCount = 0;
     int processedMatches = 0;
     int totalDeaths = 0;
     double totalADR;
+    QMap<QString, MapStats> mapStats;
 };
 #endif // MAINWINDOW_H
 
