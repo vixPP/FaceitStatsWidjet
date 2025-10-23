@@ -27,6 +27,8 @@ MainWindow::MainWindow(QWidget *parent)
     avatarNetworkManager = new QNetworkAccessManager(this);
     bestMapImageNetworkManager = new QNetworkAccessManager(this);
 
+    matchesToFetch = 10;
+
     // Подключение сигналов
     connect(ui->pushButton, &QPushButton::clicked, this, &MainWindow::onFetchStatsClicked);
     connect(networkManager, &QNetworkAccessManager::finished, this, &MainWindow::onRequestFinished);
@@ -37,6 +39,10 @@ MainWindow::MainWindow(QWidget *parent)
     connect(historyNetworkManager, &QNetworkAccessManager::finished, this, &MainWindow::onMatchHistoryFetched);
     matchStatsNetworkManager = new QNetworkAccessManager(this);
     connect(matchStatsNetworkManager, &QNetworkAccessManager::finished, this, &MainWindow::onMatchStatsFetched);
+    connect(ui->pushButton_10, &QPushButton::clicked, this, &MainWindow::onFetch10MatchesClicked);
+    connect(ui->pushButton_20, &QPushButton::clicked, this, &MainWindow::onFetch20MatchesClicked);
+    connect(ui->pushButton_30, &QPushButton::clicked, this, &MainWindow::onFetch30MatchesClicked);
+
 
     avatarLabel = ui->label_avatar;
     applyRoundedCorners();
@@ -49,6 +55,12 @@ MainWindow::~MainWindow()
 
 void MainWindow::onFetchStatsClicked()
 {
+    totalKills = 0;
+    totalDeaths = 0;
+    totalADR = 0.0;
+    matchesCount = 0;
+    processedMatches = 0;
+
     QString nickname = ui->lineEditIRL->text().trimmed();
     if (nickname.isEmpty())
     {
@@ -135,7 +147,8 @@ void MainWindow::onRequestFinished(QNetworkReply *reply)
     statsRequest.setRawHeader("Authorization", QString("Bearer %1").arg(apiKey).toUtf8());
     statsNetworkManager->get(statsRequest);
 
-    QString matchHistoryUrl = QString("https://open.faceit.com/data/v4/players/%1/history?game=cs2&offset=0&limit=10").arg(playerId);
+    QString matchHistoryUrl = QString("https://open.faceit.com/data/v4/players/%1/history?game=cs2&offset=0&limit=%2").arg(playerId).arg(matchesToFetch);
+
     QNetworkRequest matchHistoryRequest;
     matchHistoryRequest.setUrl(QUrl(matchHistoryUrl));
     matchHistoryRequest.setRawHeader("Authorization", QString("Bearer %1").arg(apiKey).toUtf8());
@@ -153,7 +166,7 @@ void MainWindow::onMatchHistoryFinished(QNetworkReply *reply)
         return;
     }
     QByteArray responseData = reply->readAll();
-    qDebug().noquote() <<  "Player Stats JSON:" << QString(responseData);
+    //qDebug().noquote() <<  "Player Stats JSON:" << QString(responseData);
     reply->deleteLater();
     QJsonDocument jsonDoc = QJsonDocument::fromJson(responseData);
     if (jsonDoc.isNull() || !jsonDoc.isObject())
@@ -303,18 +316,21 @@ void MainWindow::onMatchStatsFetched(QNetworkReply *reply)
         reply->deleteLater();
         return;
     }
-
     QByteArray responseData = reply->readAll();
     reply->deleteLater();
-
     QJsonDocument jsonDoc = QJsonDocument::fromJson(responseData);
     if (jsonDoc.isNull() || !jsonDoc.isObject())
     {
         qDebug() << "Ошибка разбора JSON статистики матча.";
         return;
     }
-
     QJsonObject root = jsonDoc.object();
+    bool playerFoundInMatch = false;
+    int matchKills = 0;
+    int matchDeaths = 0;
+    double matchADR = 0.0;
+    double matchKDRatio = 0.0;
+
     if (root.contains("rounds") && root["rounds"].isArray())
     {
         QJsonArray rounds = root["rounds"].toArray();
@@ -338,30 +354,24 @@ void MainWindow::onMatchStatsFetched(QNetworkReply *reply)
                             QJsonObject player = playerValue.toObject();
                             if (player["player_id"].toString() == currentPlayerId)
                             {
+                                playerFoundInMatch = true;
                                 if (player.contains("player_stats") && player["player_stats"].isObject())
                                 {
                                     QJsonObject stats = player["player_stats"].toObject();
                                     if (stats.contains("Kills"))
                                     {
-                                        // Преобразуем строку в число
-                                        int kills = stats["Kills"].toString().toInt();
-                                        totalKills += kills;
-                                        matchesCount++;
-                                        qDebug() << "Match Kills:" << kills
-                                                 << "Match deathes" << totalDeaths
-                                                 << "Total Kills:" << totalKills
-                                                 << "Matches Count:" << matchesCount;
+                                        matchKills = stats["Kills"].toString().toInt();
+                                        totalKills += matchKills;
                                     }
                                     if (stats.contains("Deaths"))
                                     {
-                                        int deaths = stats["Deaths"].toString().toInt();
-                                        totalDeaths += deaths;
+                                        matchDeaths = stats["Deaths"].toString().toInt();
+                                        totalDeaths += matchDeaths;
                                     }
                                     if (stats.contains("ADR"))
                                     {
-                                                   double adr = stats["ADR"].toString().toDouble();
-                                                   totalADR += adr;
-                                                   qDebug() << "Match ADR:" << adr << "Total ADR:" << totalADR;
+                                        matchADR = stats["ADR"].toString().toDouble();
+                                        totalADR += matchADR;
                                     }
                                 }
                             }
@@ -372,23 +382,43 @@ void MainWindow::onMatchStatsFetched(QNetworkReply *reply)
         }
     }
 
+    if (playerFoundInMatch)
+    {
+
+        matchesCount++;
+        matchKDRatio = (matchDeaths == 0) ? matchKills : static_cast<double>(matchKills) / matchDeaths;
+        matchKDRatios.append(matchKDRatio);
+
+        // Подсчёт и вывод KD за 10, 20, 30 матчей
+        if (matchesCount == 10 || matchesCount == 20 || matchesCount == 30)
+        {
+            double totalKD = (totalDeaths == 0) ? totalKills : static_cast<double>(totalKills) / totalDeaths;
+            qDebug().noquote() << QString("Общий KD за %1 матчей: %2").arg(matchesCount).arg(totalKD, 0, 'f', 2);
+        }
+    }
+
     processedMatches++;
-    if (processedMatches == 10) {
-        if (matchesCount > 0) {
+    qDebug() << "Processed:" << processedMatches << "Matches Count:" << matchesCount;
+
+    if (processedMatches == matchesToFetch)
+    {
+        if (matchesCount > 0)
+        {
             double averageKills = static_cast<double>(totalKills) / matchesCount;
-            ui->text_AVG_LastMatches->setText(QString("AVG.K     %1").arg(averageKills, 0, 'f', 2));
-
-            double kdRatio = (totalDeaths == 0) ? totalKills : static_cast<double>(totalKills) / totalDeaths;
-            ui->text_KD_LastMatches->setText(QString("KD        %1").arg(kdRatio, 0, 'f', 2));
-
+            ui->text_AVG_LastMatches->setText(QString("AVG.K:    %1").arg(averageKills, 0, 'f', 2));
+            double averageKD = std::accumulate(matchKDRatios.begin(), matchKDRatios.end(), 0.0) / matchKDRatios.size();
+            ui->text_KD_LastMatches->setText (QString("KD:       %1").arg(averageKD, 0, 'f', 2));
             double averageADR = totalADR / matchesCount;
-            ui->text_ADR_LastMatches->setText(QString("ADR       %1").arg(averageADR, 0, 'f', 2));
-        } else
+            ui->text_ADR_LastMatches->setText(QString("ADR:      %1").arg(averageADR, 0, 'f', 2));
+        }
+        else
         {
             ui->text_AVG_LastMatches->setText("Нет данных о матчах.");
         }
     }
 }
+
+
 
 void MainWindow::onAvatarDownloaded(QNetworkReply *reply)
 {
@@ -448,7 +478,76 @@ void MainWindow::onBestMapImageDownloaded(QNetworkReply *reply)
     reply->deleteLater();
 }
 
+void MainWindow::onFetch10MatchesClicked()
+{
+    totalKills = 0;
+    totalDeaths = 0;
+    totalADR = 0.0;
+    matchesCount = 0;
+    processedMatches = 0;
+    matchKDRatios.clear();
 
+    matchesToFetch = 10; // Меняем на 20 матчей
+    ui->label_2->setText("Last 10 matches"); // Обновляем текст лейбла
+    // Перезапрашиваем статистику
+    QString playerId = currentPlayerId;
+    if (playerId.isEmpty()) return;
+    QString matchHistoryUrl = QString("https://open.faceit.com/data/v4/players/%1/history?game=cs2&offset=0&limit=%2").arg(playerId).arg(matchesToFetch);
+    QNetworkRequest matchHistoryRequest;
+    matchHistoryRequest.setUrl(QUrl(matchHistoryUrl));
+    matchHistoryRequest.setRawHeader("Authorization", QString("Bearer %1").arg(apiKey).toUtf8());
+    matchHistoryRequest.setRawHeader("Accept", "application/json");
+    matchHistoryRequest.setRawHeader("User-Agent", "MyApp/1.0");
+    historyNetworkManager->get(matchHistoryRequest);
+}
+
+
+void MainWindow::onFetch20MatchesClicked()
+{
+    totalKills = 0;
+    totalDeaths = 0;
+    totalADR = 0.0;
+    matchesCount = 0;
+    processedMatches = 0;
+    matchKDRatios.clear();
+
+    matchesToFetch = 20; // Меняем на 20 матчей
+    ui->label_2->setText("Last 20 matches"); // Обновляем текст лейбла
+    // Перезапрашиваем статистику
+    QString playerId = currentPlayerId;
+    if (playerId.isEmpty()) return;
+    QString matchHistoryUrl = QString("https://open.faceit.com/data/v4/players/%1/history?game=cs2&offset=0&limit=%2").arg(playerId).arg(matchesToFetch);
+    QNetworkRequest matchHistoryRequest;
+    matchHistoryRequest.setUrl(QUrl(matchHistoryUrl));
+    matchHistoryRequest.setRawHeader("Authorization", QString("Bearer %1").arg(apiKey).toUtf8());
+    matchHistoryRequest.setRawHeader("Accept", "application/json");
+    matchHistoryRequest.setRawHeader("User-Agent", "MyApp/1.0");
+    historyNetworkManager->get(matchHistoryRequest);
+}
+
+
+void MainWindow::onFetch30MatchesClicked()
+{
+    totalKills = 0;
+    totalDeaths = 0;
+    totalADR = 0.0;
+    matchesCount = 0;
+    processedMatches = 0;
+    matchKDRatios.clear();
+
+    matchesToFetch = 30; // Меняем на 20 матчей
+    ui->label_2->setText("Last 30 matches"); // Обновляем текст лейбла
+    // Перезапрашиваем статистику
+    QString playerId = currentPlayerId;
+    if (playerId.isEmpty()) return;
+    QString matchHistoryUrl = QString("https://open.faceit.com/data/v4/players/%1/history?game=cs2&offset=0&limit=%2").arg(playerId).arg(matchesToFetch);
+    QNetworkRequest matchHistoryRequest;
+    matchHistoryRequest.setUrl(QUrl(matchHistoryUrl));
+    matchHistoryRequest.setRawHeader("Authorization", QString("Bearer %1").arg(apiKey).toUtf8());
+    matchHistoryRequest.setRawHeader("Accept", "application/json");
+    matchHistoryRequest.setRawHeader("User-Agent", "MyApp/1.0");
+    historyNetworkManager->get(matchHistoryRequest);
+}
 
 void MainWindow::applyRoundedCorners()
 {
@@ -459,3 +558,6 @@ void MainWindow::applyRoundedCorners()
     painter.drawRoundedRect(mask.rect(), 10, 10);
     setMask(mask);
 }
+
+
+

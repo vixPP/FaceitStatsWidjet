@@ -35,6 +35,10 @@ private slots:
     void onMatchHistoryFetched(QNetworkReply *reply);
     void onMatchStatsFetched(QNetworkReply *reply);
     void onBestMapImageDownloaded(QNetworkReply *reply);
+    void onFetch10MatchesClicked();
+    void onFetch20MatchesClicked();
+    void onFetch30MatchesClicked();
+
 
 private:
     Ui::MainWindow *ui;
@@ -54,8 +58,10 @@ private:
     int matchesCount = 0;
     int processedMatches = 0;
     int totalDeaths = 0;
+    int matchesToFetch;
     double totalADR;
     QMap<QString, MapStats> mapStats;
+    QList<double> matchKDRatios;
 };
 #endif // MAINWINDOW_H
 
