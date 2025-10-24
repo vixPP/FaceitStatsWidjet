@@ -42,6 +42,9 @@ MainWindow::MainWindow(QWidget *parent)
     connect(ui->pushButton_10, &QPushButton::clicked, this, &MainWindow::onFetch10MatchesClicked);
     connect(ui->pushButton_20, &QPushButton::clicked, this, &MainWindow::onFetch20MatchesClicked);
     connect(ui->pushButton_30, &QPushButton::clicked, this, &MainWindow::onFetch30MatchesClicked);
+    internalStatsNetworkManager = new QNetworkAccessManager(this);
+    connect(internalStatsNetworkManager, &QNetworkAccessManager::finished, this, &MainWindow::onInternalMatchStatsFetched);
+
 
 
     avatarLabel = ui->label_avatar;
@@ -52,6 +55,8 @@ MainWindow::~MainWindow()
 {
     delete ui;
 }
+
+
 
 void MainWindow::onFetchStatsClicked()
 {
@@ -125,8 +130,8 @@ void MainWindow::onRequestFinished(QNetworkReply *reply)
             QJsonObject cs2 = games["cs2"].toObject();
             if (cs2.contains("faceit_elo"))
             {
-                int elo = cs2["faceit_elo"].toInt();
-                ui->text_elo->setText(QString("ELO:      %1").arg(elo));
+                currentPlayerElo = cs2["faceit_elo"].toInt();
+                ui->text_elo->setText(QString("ELO:      %1").arg(currentPlayerElo));
             }
         }
     }
@@ -258,16 +263,17 @@ void MainWindow::onMatchHistoryFinished(QNetworkReply *reply)
 
 
 
-void MainWindow::onMatchHistoryFetched(QNetworkReply *reply)
-{
+void MainWindow::onMatchHistoryFetched(QNetworkReply *reply) {
     totalKills = 0;  // Сброс счётчиков
     matchesCount = 0;
     totalDeaths = 0;
     processedMatches = 0;
     totalADR = 0;
 
-    if (reply->error() != QNetworkReply::NoError)
-    {
+    // Переменная для хранения ID последнего матча
+    QString lastMatchId;
+
+    if (reply->error() != QNetworkReply::NoError) {
         ui->text_AVG_LastMatches->setText("Ошибка: " + reply->errorString());
         reply->deleteLater();
         return;
@@ -277,26 +283,27 @@ void MainWindow::onMatchHistoryFetched(QNetworkReply *reply)
     reply->deleteLater();
 
     QJsonDocument jsonDoc = QJsonDocument::fromJson(responseData);
-    if (jsonDoc.isNull() || !jsonDoc.isObject())
-    {
-        qDebug().noquote() << jsonDoc.toJson(QJsonDocument::Indented); 
+    if (jsonDoc.isNull() || !jsonDoc.isObject()) {
+        qDebug().noquote() << jsonDoc.toJson(QJsonDocument::Indented);
         ui->text_AVG_LastMatches->setText("Ошибка: некорректный JSON.");
         return;
     }
 
-
     QJsonObject root = jsonDoc.object();
-    if (root.contains("items") && root["items"].isArray())
-    {
+    if (root.contains("items") && root["items"].isArray()) {
         QJsonArray matches = root["items"].toArray();
-        for (const QJsonValue &matchValue : matches)
-        {
+
+        // Проходим по всем матчам и сохраняем ID последнего
+        for (const QJsonValue &matchValue : matches) {
             if (!matchValue.isObject()) continue;
             QJsonObject match = matchValue.toObject();
+
             QString matchId = match["match_id"].toString();
-            if (!matchId.isEmpty())
-            {
-                // Запрашиваем статистику матча
+            if (!matchId.isEmpty()) {
+                // Сохраняем ID каждого матча, последний перезапишет предыдущие
+                lastMatchId = matchId;
+
+                // Запрос статистики матча
                 QString matchStatsUrl = QString("https://open.faceit.com/data/v4/matches/%1/stats").arg(matchId);
                 QNetworkRequest matchStatsRequest;
                 matchStatsRequest.setUrl(QUrl(matchStatsUrl));
@@ -304,8 +311,15 @@ void MainWindow::onMatchHistoryFetched(QNetworkReply *reply)
                 matchStatsNetworkManager->get(matchStatsRequest);
             }
         }
+
+        // После обработки всех матчей вызываем метод для последнего
+        if (!lastMatchId.isEmpty())
+        {
+            fetchInternalMatchStats(lastMatchId);
+        }
     }
 }
+
 
 
 void MainWindow::onMatchStatsFetched(QNetworkReply *reply)
@@ -549,6 +563,110 @@ void MainWindow::onFetch30MatchesClicked()
     historyNetworkManager->get(matchHistoryRequest);
 }
 
+void MainWindow::fetchInternalMatchStats(const QString &matchId)
+{
+    QString internalStatsUrl = QString("https://www.faceit.com/api/stats/v3/matches/%1").arg(matchId);
+    qDebug() << "URL: " << internalStatsUrl;
+    QNetworkRequest internalStatsRequest;
+    internalStatsRequest.setUrl(QUrl(internalStatsUrl));
+    internalStatsNetworkManager->get(internalStatsRequest);
+}
+
+void MainWindow::onInternalMatchStatsFetched(QNetworkReply *reply)
+{
+    if (reply->error() != QNetworkReply::NoError)
+    {
+        qDebug() << "Ошибка запроса внутренней статистики матча:" << reply->errorString();
+        reply->deleteLater();
+        return;
+    }
+
+    QByteArray responseData = reply->readAll();
+    QJsonDocument jsonDoc = QJsonDocument::fromJson(responseData);
+
+    if (jsonDoc.isNull())
+    {
+        qDebug() << "Ошибка разбора JSON: документ пуст.";
+        reply->deleteLater();
+        return;
+    }
+
+    if (!jsonDoc.isArray())
+    {
+        qDebug() << "JSON не является массивом.";
+        reply->deleteLater();
+        return;
+    }
+
+    QJsonArray matches = jsonDoc.array();
+    if (matches.isEmpty())
+    {
+        qDebug() << "Массив матчей пуст.";
+        reply->deleteLater();
+        return;
+    }
+
+    QJsonObject match = matches.first().toObject();
+    if (!match.contains("teams") || !match["teams"].isArray())
+    {
+        qDebug() << "В JSON нет ключа 'teams' или он не является массивом.";
+        reply->deleteLater();
+        return;
+    }
+
+    QJsonArray teams = match["teams"].toArray();
+    QString targetPlayerId = currentPlayerId.trimmed();
+    qDebug() << "Ищем игрока с ID:" << targetPlayerId;
+
+    for (const QJsonValue &teamValue : teams)
+    {
+        if (!teamValue.isObject())
+            continue;
+
+        QJsonObject team = teamValue.toObject();
+        QString teamName = team.contains("teamName") ? team["teamName"].toString() : "Unknown Team";
+        qDebug() << "Команда:" << teamName;
+
+        if (!team.contains("players") || !team["players"].isArray())
+        {
+            qDebug() << "  В команде" << teamName << "нет ключа 'players' или он не является массивом.";
+            continue;
+        }
+
+        QJsonArray players = team["players"].toArray();
+        qDebug() << "  Количество игроков в команде:" << players.size();
+
+        for (const QJsonValue &playerValue : players)
+        {
+            if (!playerValue.isObject())
+                continue;
+
+            QJsonObject player = playerValue.toObject();
+            QString nickname = player.contains("nickname") ? player["nickname"].toString() : "Unknown Player";
+            QString playerId = player.contains("playerId") ? player["playerId"].toString().trimmed() : "Unknown ID";
+
+            qDebug() << "  Игрок:" << nickname << "с ID:" << playerId;
+
+            if (playerId == targetPlayerId)
+            {
+                int DifElo;
+                int EloPastGames = player.contains("elo") ? player["elo"].toInt() : -1;
+                DifElo = currentPlayerElo - EloPastGames;
+
+                qDebug() << "Найден игрок с ELO:" << EloPastGames;
+                ui->text_ELO_Change->setText( QString("ELO:      %1%2").arg(DifElo >= 0 ? "+" : "").arg(DifElo));
+
+                reply->deleteLater();
+                return;
+            }
+        }
+    }
+
+    qDebug() << "Игрок не найден в этом матче. PlayerId:" << targetPlayerId;
+    ui->text_ELO_Change->setText("Игрок не найден в этом матче.");
+    reply->deleteLater();
+}
+
 void MainWindow::applyRoundedCorners()
 {
     QBitmap mask(size());
@@ -558,6 +676,3 @@ void MainWindow::applyRoundedCorners()
     painter.drawRoundedRect(mask.rect(), 10, 10);
     setMask(mask);
 }
-
-
-

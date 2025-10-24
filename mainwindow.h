@@ -27,6 +27,7 @@ public:
     ~MainWindow();
     void applyRoundedCorners();
 
+
 private slots:
     void onFetchStatsClicked();
     void onRequestFinished(QNetworkReply *reply);
@@ -38,7 +39,8 @@ private slots:
     void onFetch10MatchesClicked();
     void onFetch20MatchesClicked();
     void onFetch30MatchesClicked();
-
+    void fetchInternalMatchStats(const QString &matchId);
+    void onInternalMatchStatsFetched(QNetworkReply *reply);
 
 private:
     Ui::MainWindow *ui;
@@ -48,12 +50,17 @@ private:
     QNetworkAccessManager *historyNetworkManager;
     QNetworkAccessManager *matchStatsNetworkManager;
     QNetworkAccessManager* bestMapImageNetworkManager;
+    QNetworkAccessManager *internalStatsNetworkManager;
+
     QString currentPlayerId;
     QString apiKey = "7334b675-bf37-41a3-9f37-df39acb05fba"; // Перенесено в поле класса
     QLabel *avatarLabel;
     QLabel *text_KR;
     QLabel *bestMapImageLabel;
 
+
+
+    int currentPlayerElo; // Текущее ELO игрока
     int totalKills = 0;
     int matchesCount = 0;
     int processedMatches = 0;

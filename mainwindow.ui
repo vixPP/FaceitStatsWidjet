@@ -361,34 +361,6 @@ color: rgb(214, 214, 214);
       <string>ADR       ?</string>
      </property>
     </widget>
-    <widget class="QLabel" name="text_ELO_Change">
-     <property name="geometry">
-      <rect>
-       <x>0</x>
-       <y>40</y>
-       <width>171</width>
-       <height>41</height>
-      </rect>
-     </property>
-     <property name="font">
-      <font>
-       <family>Courier</family>
-       <pointsize>11</pointsize>
-       <bold>true</bold>
-      </font>
-     </property>
-     <property name="styleSheet">
-      <string notr="true">QLabel
-
-{
-color: rgb(214, 214, 214);
-}
-</string>
-     </property>
-     <property name="text">
-      <string>ELO       ?</string>
-     </property>
-    </widget>
     <widget class="QLabel" name="text_AVG_LastMatches">
      <property name="geometry">
       <rect>
@@ -421,6 +393,34 @@ color: rgb(214, 214, 214);
      </property>
      <property name="text">
       <string>AVG.K     ?</string>
+     </property>
+    </widget>
+    <widget class="QLabel" name="text_ELO_Change">
+     <property name="geometry">
+      <rect>
+       <x>0</x>
+       <y>40</y>
+       <width>171</width>
+       <height>41</height>
+      </rect>
+     </property>
+     <property name="font">
+      <font>
+       <family>Courier</family>
+       <pointsize>11</pointsize>
+       <bold>true</bold>
+      </font>
+     </property>
+     <property name="styleSheet">
+      <string notr="true">QLabel
+
+{
+color: rgb(214, 214, 214);
+}
+</string>
+     </property>
+     <property name="text">
+      <string>ELO       ?</string>
      </property>
     </widget>
    </widget>
