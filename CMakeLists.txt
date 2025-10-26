@@ -12,6 +12,9 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 find_package(QT NAMES Qt6 Qt5 REQUIRED COMPONENTS Widgets)
 find_package(Qt${QT_VERSION_MAJOR} REQUIRED COMPONENTS Widgets)
 find_package(Qt6 REQUIRED COMPONENTS Widgets Network)
+find_package(Qt6 REQUIRED COMPONENTS Widgets)
+
+qt_add_resources(RESOURCES "resources.qrc")
 
 set(PROJECT_SOURCES
         main.cpp
@@ -45,6 +48,7 @@ endif()
 
 target_link_libraries(FaceitUrStats PRIVATE Qt${QT_VERSION_MAJOR}::Widgets)
 target_link_libraries(FaceitUrStats PRIVATE Qt6::Widgets Qt6::Network)
+target_sources(FaceitUrStats PRIVATE ${RESOURCES})
 
 set_target_properties(FaceitUrStats PROPERTIES
     MACOSX_BUNDLE_GUI_IDENTIFIER my.example.com

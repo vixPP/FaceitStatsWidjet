@@ -41,6 +41,9 @@ private slots:
     void onFetch30MatchesClicked();
     void fetchInternalMatchStats(const QString &matchId);
     void onInternalMatchStatsFetched(QNetworkReply *reply);
+    //void startRequest(QNetworkAccessManager* manager, const QNetworkRequest& request);
+
+
 
 private:
     Ui::MainWindow *ui;
@@ -58,6 +61,9 @@ private:
     QLabel *text_KR;
     QLabel *bestMapImageLabel;
 
+    int activeRequests = 0;
+    bool isRequestInProgress = false;
+    QNetworkReply* currentReply = nullptr;
 
 
     int currentPlayerElo; // Текущее ELO игрока

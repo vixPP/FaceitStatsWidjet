@@ -43,7 +43,7 @@
      <string notr="true">QFrame
 {
 background-color: #2e2e2d;
-          border: 1px solid #9276a6;
+          border: 1px solid #522806;
            border-radius: 5px;
            padding: 10px;
 }  </string>
@@ -74,7 +74,7 @@ background-color: #2e2e2d;
       <string notr="true">QLabel
 
 {
-color: rgb(214, 214, 214);
+color: #a3520f;
 }
 </string>
      </property>
@@ -207,13 +207,13 @@ color: rgb(214, 214, 214);
       <x>10</x>
       <y>140</y>
       <width>71</width>
-      <height>31</height>
+      <height>41</height>
      </rect>
     </property>
     <property name="font">
      <font>
-      <family>Courier</family>
-      <pointsize>8</pointsize>
+      <family>Arial</family>
+      <pointsize>9</pointsize>
       <bold>true</bold>
      </font>
     </property>
@@ -221,10 +221,10 @@ color: rgb(214, 214, 214);
      <string notr="true">QLabel
 {
 background-color: #2e2e2d;
-          border: 1px solid #9276a6;
+          border: 1px solid #522806;
            border-radius: 5px;
            padding: 10px;
-color: rgb(214, 214, 214);
+
 }  </string>
     </property>
     <property name="text">
@@ -244,7 +244,7 @@ color: rgb(214, 214, 214);
      <string notr="true">QLabel
 {
 background-color: #2e2e2d;
-          border: 3px solid #9276a6;
+          border: 3px solid #522806;
            
            
 }  </string>
@@ -266,7 +266,7 @@ background-color: #2e2e2d;
      <string notr="true">QFrame
 {
 background-color: #2e2e2d;
-          border: 1px solid#9276a6;
+          border: 1px solid#522806;
            border-radius: 5px;
            padding: 10px;
 }  </string>
@@ -297,12 +297,12 @@ background-color: #2e2e2d;
       <string notr="true">QLabel
 
 {
-color: rgb(214, 214, 214);
+color: #a3520f;
 }
 </string>
      </property>
      <property name="text">
-      <string>Last 10 mathes</string>
+      <string>   Last 10 </string>
      </property>
     </widget>
     <widget class="QLabel" name="text_KD_LastMatches">
@@ -443,7 +443,7 @@ color: rgb(214, 214, 214);
      <string notr="true">QPushButton 
 {
 background-color: #3f3e40;
-          border: 2px solid #7732a8;
+          border: 2px solid  #522806;
            border-radius: 5px;
            
 color: rgb(214, 214, 214);
@@ -472,7 +472,7 @@ color: rgb(214, 214, 214);
      <string notr="true">QFrame
 {
 background-color: #2e2e2d;
-          border: 1px solid #9276a6;
+          border: 1px solid #522806;
            
            
 }  </string>
@@ -543,7 +543,7 @@ background-color: #2e2e2d;
       <string notr="true">QLabel
 
 {
-color: rgb(214, 214, 214);
+color: #a3520f;
 }
 </string>
      </property>
@@ -711,7 +711,7 @@ color: rgb(214, 214, 214);
      <string notr="true">QPushButton 
 {
 background-color: #3f3e40;
-          border: 2px solid #7732a8;
+          border: 2px solid #522806;
            border-radius: 5px;
            
 color: rgb(214, 214, 214);
@@ -746,7 +746,7 @@ color: rgb(214, 214, 214);
      <string notr="true">QPushButton 
 {
 background-color: #3f3e40;
-          border: 2px solid #7732a8;
+          border: 2px solid #522806;
            border-radius: 5px;
            
 color: rgb(214, 214, 214);
@@ -773,7 +773,7 @@ color: rgb(214, 214, 214);
     </property>
     <property name="font">
      <font>
-      <family>Courier</family>
+      <family>Arial</family>
       <pointsize>10</pointsize>
       <bold>true</bold>
      </font>
@@ -781,8 +781,8 @@ color: rgb(214, 214, 214);
     <property name="styleSheet">
      <string notr="true">QPushButton 
 {
-	background-color: #7732a8;  
-	color rgb(214, 214, 214);  
+	background-color: #a3520f;  
+	color: #1a1715;  
 	
 }
 
@@ -817,7 +817,7 @@ color: rgb(214, 214, 214);
      <string notr="true">QLineEdit
 {
 background-color: #2e2e2d;
-          border: 2px solid #9276a6;
+          border: 2px solid #522806;
            
           
 color: rgb(214, 214, 214);

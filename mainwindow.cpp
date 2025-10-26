@@ -87,6 +87,15 @@ void MainWindow::onFetchStatsClicked()
     networkManager->get(request);
 }
 
+
+/*void MainWindow::startRequest(QNetworkAccessManager* manager, const QNetworkRequest& request)
+{
+    activeRequests++;
+    isRequestInProgress = true;
+    manager->get(request);
+}*/
+
+
 void MainWindow::onRequestFinished(QNetworkReply *reply)
 {
     ui->pushButton->setEnabled(true);
@@ -160,6 +169,8 @@ void MainWindow::onRequestFinished(QNetworkReply *reply)
     matchHistoryRequest.setRawHeader("Accept", "application/json");
     matchHistoryRequest.setRawHeader("User-Agent", "MyApp/1.0");
     historyNetworkManager->get(matchHistoryRequest);
+
+
 }
 
 void MainWindow::onMatchHistoryFinished(QNetworkReply *reply)
@@ -318,6 +329,7 @@ void MainWindow::onMatchHistoryFetched(QNetworkReply *reply) {
             fetchInternalMatchStats(lastMatchId);
         }
     }
+    //onRequestFinished(reply);
 }
 
 
@@ -430,6 +442,7 @@ void MainWindow::onMatchStatsFetched(QNetworkReply *reply)
             ui->text_AVG_LastMatches->setText("Нет данных о матчах.");
         }
     }
+    //onRequestFinished(reply);
 }
 
 
@@ -616,7 +629,7 @@ void MainWindow::onInternalMatchStatsFetched(QNetworkReply *reply)
 
     QJsonArray teams = match["teams"].toArray();
     QString targetPlayerId = currentPlayerId.trimmed();
-    qDebug() << "Ищем игрока с ID:" << targetPlayerId;
+    //qDebug() << "Ищем игрока с ID:" << targetPlayerId;
 
     for (const QJsonValue &teamValue : teams)
     {
@@ -624,17 +637,17 @@ void MainWindow::onInternalMatchStatsFetched(QNetworkReply *reply)
             continue;
 
         QJsonObject team = teamValue.toObject();
-        QString teamName = team.contains("teamName") ? team["teamName"].toString() : "Unknown Team";
-        qDebug() << "Команда:" << teamName;
+        //QString teamName = team.contains("teamName") ? team["teamName"].toString() : "Unknown Team";
+        //qDebug() << "Команда:" << teamName;
 
         if (!team.contains("players") || !team["players"].isArray())
         {
-            qDebug() << "  В команде" << teamName << "нет ключа 'players' или он не является массивом.";
+            //qDebug() << "  В команде" << teamName << "нет ключа 'players' или он не является массивом.";
             continue;
         }
 
         QJsonArray players = team["players"].toArray();
-        qDebug() << "  Количество игроков в команде:" << players.size();
+        //qDebug() << "  Количество игроков в команде:" << players.size();
 
         for (const QJsonValue &playerValue : players)
         {
@@ -642,10 +655,10 @@ void MainWindow::onInternalMatchStatsFetched(QNetworkReply *reply)
                 continue;
 
             QJsonObject player = playerValue.toObject();
-            QString nickname = player.contains("nickname") ? player["nickname"].toString() : "Unknown Player";
+           // QString nickname = player.contains("nickname") ? player["nickname"].toString() : "Unknown Player";
             QString playerId = player.contains("playerId") ? player["playerId"].toString().trimmed() : "Unknown ID";
 
-            qDebug() << "  Игрок:" << nickname << "с ID:" << playerId;
+            //qDebug() << "  Игрок:" << nickname << "с ID:" << playerId;
 
             if (playerId == targetPlayerId)
             {
@@ -653,7 +666,7 @@ void MainWindow::onInternalMatchStatsFetched(QNetworkReply *reply)
                 int EloPastGames = player.contains("elo") ? player["elo"].toInt() : -1;
                 DifElo = currentPlayerElo - EloPastGames;
 
-                qDebug() << "Найден игрок с ELO:" << EloPastGames;
+                //qDebug() << "Найден игрок с ELO:" << EloPastGames;
                 ui->text_ELO_Change->setText( QString("ELO:      %1%2").arg(DifElo >= 0 ? "+" : "").arg(DifElo));
 
                 reply->deleteLater();
@@ -665,7 +678,10 @@ void MainWindow::onInternalMatchStatsFetched(QNetworkReply *reply)
     qDebug() << "Игрок не найден в этом матче. PlayerId:" << targetPlayerId;
     ui->text_ELO_Change->setText("Игрок не найден в этом матче.");
     reply->deleteLater();
+    //onRequestFinished(reply);
 }
+
+
 
 void MainWindow::applyRoundedCorners()
 {
