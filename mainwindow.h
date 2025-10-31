@@ -66,6 +66,10 @@ private:
     bool isRequestInProgress = false;
     QNetworkReply* currentReply = nullptr;
 
+    QTimer *buttonSearcheTimer;
+    QTimer *button10Timer;
+    QTimer *button20Timer;
+    QTimer *button30Timer;
     QTimer *messageTimer;
     int currentPlayerElo; // Текущее ELO игрока
     int totalKills = 0;

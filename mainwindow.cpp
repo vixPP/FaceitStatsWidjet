@@ -23,18 +23,50 @@ MainWindow::MainWindow(QWidget *parent)
     ui->setupUi(this);
 
     messageTimer = new QTimer(this);
-        messageTimer->setSingleShot(true);
-        connect(messageTimer, &QTimer::timeout, this, [this]()
-        {
-            ui->label_Errors->clear();
-        });
+    messageTimer->setSingleShot(true);
+    connect(messageTimer, &QTimer::timeout, this, [this]()
+    {
+        ui->label_Errors->clear();
+    });
+
+    buttonSearcheTimer = new QTimer(this);
+    buttonSearcheTimer->setSingleShot(true);
+    connect(buttonSearcheTimer, &QTimer::timeout, this, [this]()
+    {
+        ui->pushButton->setEnabled(true);
+    });
+
+
+    button10Timer = new QTimer(this);
+    button10Timer->setSingleShot(true);
+    connect(button10Timer, &QTimer::timeout, this, [this]()
+    {
+        ui->pushButton_10->setEnabled(true);
+    });
+
+    button20Timer = new QTimer(this);
+    button20Timer->setSingleShot(true);
+    connect(button20Timer, &QTimer::timeout, this, [this]()
+    {
+        ui->pushButton_20->setEnabled(true);
+    });
+
+    button30Timer = new QTimer(this);
+    button30Timer->setSingleShot(true);
+    connect(button30Timer, &QTimer::timeout, this, [this]()
+    {
+        ui->pushButton_30->setEnabled(true);
+    });
+
+
+
 
     QSettings settings("config.ini", QSettings::IniFormat);
-        QString savedNickname = settings.value("Player/Nickname", "").toString();
-        if (!savedNickname.isEmpty())
-        {
-            ui->lineEditIRL->setText(savedNickname);
-        }
+    QString savedNickname = settings.value("Player/Nickname", "").toString();
+    if (!savedNickname.isEmpty())
+    {
+        ui->lineEditIRL->setText(savedNickname);
+    }
 
 
     ui->label_NAME->setAlignment(Qt::AlignCenter);
@@ -72,11 +104,6 @@ MainWindow::MainWindow(QWidget *parent)
     applyRoundedCorners();
 }
 
-MainWindow::~MainWindow()
-{
-    delete ui;
-}
-
 
 void MainWindow::on_Button_Save_clicked()
 {
@@ -109,6 +136,8 @@ void MainWindow::onFetchStatsClicked()
 
     // Блокировка UI на время запроса
     ui->pushButton->setEnabled(false);
+    buttonSearcheTimer->start(3000);
+
     ui->label_NAME->setText("Загрузка...");
     ui->text_elo->clear();
     ui->text_KD->clear();
@@ -125,7 +154,7 @@ void MainWindow::onFetchStatsClicked()
 
 void MainWindow::onRequestFinished(QNetworkReply *reply)
 {
-    ui->pushButton->setEnabled(true);
+
 
     if (reply->error() != QNetworkReply::NoError)
     {
@@ -356,7 +385,7 @@ void MainWindow::onMatchHistoryFetched(QNetworkReply *reply) {
             fetchInternalMatchStats(lastMatchId);
         }
     }
-    //onRequestFinished(reply);
+
 }
 
 
@@ -534,6 +563,16 @@ void MainWindow::onBestMapImageDownloaded(QNetworkReply *reply)
 
 void MainWindow::onFetch10MatchesClicked()
 {
+    // Блокируем все кнопки
+    ui->pushButton_10->setEnabled(false);
+    ui->pushButton_20->setEnabled(false);
+    ui->pushButton_30->setEnabled(false);
+
+    // Запускаем таймеры для всех кнопок
+    button10Timer->start(3000);
+    button20Timer->start(3000);
+    button30Timer->start(3000);
+
     totalKills = 0;
     totalDeaths = 0;
     totalADR = 0.0;
@@ -558,6 +597,16 @@ void MainWindow::onFetch10MatchesClicked()
 
 void MainWindow::onFetch20MatchesClicked()
 {
+    // Блокируем все кнопки
+    ui->pushButton_10->setEnabled(false);
+    ui->pushButton_20->setEnabled(false);
+    ui->pushButton_30->setEnabled(false);
+
+    // Запускаем таймеры для всех кнопок
+    button10Timer->start(3000);
+    button20Timer->start(3000);
+    button30Timer->start(3000);
+
     totalKills = 0;
     totalDeaths = 0;
     totalADR = 0.0;
@@ -582,6 +631,16 @@ void MainWindow::onFetch20MatchesClicked()
 
 void MainWindow::onFetch30MatchesClicked()
 {
+    // Блокируем все кнопки
+    ui->pushButton_10->setEnabled(false);
+    ui->pushButton_20->setEnabled(false);
+    ui->pushButton_30->setEnabled(false);
+
+    // Запускаем таймеры для всех кнопок
+    button10Timer->start(3000);
+    button20Timer->start(3000);
+    button30Timer->start(3000);
+
     totalKills = 0;
     totalDeaths = 0;
     totalADR = 0.0;
@@ -591,9 +650,10 @@ void MainWindow::onFetch30MatchesClicked()
 
     matchesToFetch = 30;
     ui->label_2->setText("   Last 30");
-    // Перезапрашиваем статистику
+
     QString playerId = currentPlayerId;
     if (playerId.isEmpty()) return;
+
     QString matchHistoryUrl = QString("https://open.faceit.com/data/v4/players/%1/history?game=cs2&offset=0&limit=%2").arg(playerId).arg(matchesToFetch);
     QNetworkRequest matchHistoryRequest;
     matchHistoryRequest.setUrl(QUrl(matchHistoryUrl));
@@ -718,4 +778,12 @@ void MainWindow::applyRoundedCorners()
     painter.setBrush(Qt::color1);
     painter.drawRoundedRect(mask.rect(), 10, 10);
     setMask(mask);
+}
+
+MainWindow::~MainWindow()
+{
+    delete button10Timer;
+    delete button20Timer;
+    delete button30Timer;
+    delete ui;
 }
