@@ -5,6 +5,8 @@
 #include <QMainWindow>
 #include <QNetworkAccessManager>
 #include <QNetworkReply>
+#include <QSettings>
+#include <QTimer>
 
 QT_BEGIN_NAMESPACE
 namespace Ui { class MainWindow; }
@@ -41,8 +43,7 @@ private slots:
     void onFetch30MatchesClicked();
     void fetchInternalMatchStats(const QString &matchId);
     void onInternalMatchStatsFetched(QNetworkReply *reply);
-    //void startRequest(QNetworkAccessManager* manager, const QNetworkRequest& request);
-
+    void on_Button_Save_clicked();
 
 
 private:
@@ -65,7 +66,7 @@ private:
     bool isRequestInProgress = false;
     QNetworkReply* currentReply = nullptr;
 
-
+    QTimer *messageTimer;
     int currentPlayerElo; // Текущее ELO игрока
     int totalKills = 0;
     int matchesCount = 0;

@@ -221,10 +221,10 @@ color: rgb(214, 214, 214);
      <string notr="true">QLabel
 {
 background-color: #2e2e2d;
-          border: 1px solid #522806;
-           border-radius: 5px;
-           padding: 10px;
-
+border: 1px solid #522806;
+setWordWrap: true;         
+setAlignment: AlignCenter;          
+color: rgb(214, 214, 214)
 }  </string>
     </property>
     <property name="text">
@@ -451,7 +451,7 @@ color: rgb(214, 214, 214);
 
     QPushButton:hover 
 {
-      background-color: #29203b;  
+      background-color: #522806;  
     }
 </string>
     </property>
@@ -500,9 +500,10 @@ background-color: #2e2e2d;
       </font>
      </property>
      <property name="styleSheet">
-      <string notr="true">Qlabel
-{
+      <string notr="true">QLabel
 
+{
+color: rgb(214, 214, 214);
 }
 </string>
      </property>
@@ -719,7 +720,7 @@ color: rgb(214, 214, 214);
 
     QPushButton:hover 
 {
-      background-color: #29203b;  
+      background-color: #522806;  
     }
 </string>
     </property>
@@ -754,7 +755,7 @@ color: rgb(214, 214, 214);
 
     QPushButton:hover 
 {
-      background-color: #29203b;  
+      background-color: #522806;  
     }
 </string>
     </property>
@@ -765,9 +766,9 @@ color: rgb(214, 214, 214);
    <widget class="QPushButton" name="pushButton">
     <property name="geometry">
      <rect>
-      <x>260</x>
+      <x>230</x>
       <y>20</y>
-      <width>81</width>
+      <width>71</width>
       <height>31</height>
      </rect>
     </property>
@@ -788,7 +789,7 @@ color: rgb(214, 214, 214);
 
     QPushButton:hover 
 {
-      background-color: #29203b;  
+      background-color: #522806;  
     }
 
 </string>
@@ -800,7 +801,7 @@ color: rgb(214, 214, 214);
    <widget class="QLineEdit" name="lineEditIRL">
     <property name="geometry">
      <rect>
-      <x>30</x>
+      <x>20</x>
       <y>20</y>
       <width>201</width>
       <height>31</height>
@@ -828,6 +829,48 @@ color: rgb(214, 214, 214);
     </property>
     <property name="placeholderText">
      <string>Enter nickname</string>
+    </property>
+   </widget>
+   <widget class="QPushButton" name="Button_Save">
+    <property name="geometry">
+     <rect>
+      <x>310</x>
+      <y>20</y>
+      <width>41</width>
+      <height>31</height>
+     </rect>
+    </property>
+    <property name="styleSheet">
+     <string notr="true">QPushButton 
+{
+background-color: #a7f054;
+          border: 2px solid  #522806;
+           border-radius: 5px;
+           
+color: #1a1715;
+}
+
+    QPushButton:hover 
+{
+      background-color: #522806;  
+    }
+</string>
+    </property>
+    <property name="text">
+     <string>SAVE</string>
+    </property>
+   </widget>
+   <widget class="QLabel" name="label_Errors">
+    <property name="geometry">
+     <rect>
+      <x>68</x>
+      <y>415</y>
+      <width>231</width>
+      <height>21</height>
+     </rect>
+    </property>
+    <property name="text">
+     <string/>
     </property>
    </widget>
   </widget>

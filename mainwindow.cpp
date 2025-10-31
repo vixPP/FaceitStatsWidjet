@@ -9,6 +9,7 @@
 #include <QPainter>
 #include <QPixmap>
 #include <QMovie>
+#include <QTimer>
 
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
@@ -20,7 +21,27 @@ MainWindow::MainWindow(QWidget *parent)
     , processedMatches(0)
 {
     ui->setupUi(this);
+
+    messageTimer = new QTimer(this);
+        messageTimer->setSingleShot(true);
+        connect(messageTimer, &QTimer::timeout, this, [this]()
+        {
+            ui->label_Errors->clear();
+        });
+
+    QSettings settings("config.ini", QSettings::IniFormat);
+        QString savedNickname = settings.value("Player/Nickname", "").toString();
+        if (!savedNickname.isEmpty())
+        {
+            ui->lineEditIRL->setText(savedNickname);
+        }
+
+
+    ui->label_NAME->setAlignment(Qt::AlignCenter);
+    ui->label_NAME->setWordWrap(true);
     bestMapImageLabel = ui->label_BestMapImage;
+
+
     // Инициализация сетевых менеджеров
     networkManager = new QNetworkAccessManager(this);
     statsNetworkManager = new QNetworkAccessManager(this);
@@ -44,7 +65,7 @@ MainWindow::MainWindow(QWidget *parent)
     connect(ui->pushButton_30, &QPushButton::clicked, this, &MainWindow::onFetch30MatchesClicked);
     internalStatsNetworkManager = new QNetworkAccessManager(this);
     connect(internalStatsNetworkManager, &QNetworkAccessManager::finished, this, &MainWindow::onInternalMatchStatsFetched);
-
+    connect(ui->Button_Save, &QPushButton::clicked, this, &MainWindow::on_Button_Save_clicked);
 
 
     avatarLabel = ui->label_avatar;
@@ -57,6 +78,20 @@ MainWindow::~MainWindow()
 }
 
 
+void MainWindow::on_Button_Save_clicked()
+{
+    QString nickname = ui->lineEditIRL->text().trimmed();
+    if (!nickname.isEmpty())
+    {
+        QSettings settings("config.ini", QSettings::IniFormat);
+        settings.setValue("Player/Nickname", nickname);
+        ui->label_Errors->setText("Никнейм сохранён!");
+        messageTimer->start(5000);
+    } else
+    {
+        ui->label_Errors->setText("Ошибка: никнейм пуст!");
+    }
+}
 
 void MainWindow::onFetchStatsClicked()
 {
@@ -86,14 +121,6 @@ void MainWindow::onFetchStatsClicked()
     request.setRawHeader("Authorization", QString("Bearer %1").arg(apiKey).toUtf8());
     networkManager->get(request);
 }
-
-
-/*void MainWindow::startRequest(QNetworkAccessManager* manager, const QNetworkRequest& request)
-{
-    activeRequests++;
-    isRequestInProgress = true;
-    manager->get(request);
-}*/
 
 
 void MainWindow::onRequestFinished(QNetworkReply *reply)
@@ -515,7 +542,7 @@ void MainWindow::onFetch10MatchesClicked()
     matchKDRatios.clear();
 
     matchesToFetch = 10; // Меняем на 20 матчей
-    ui->label_2->setText("Last 10 matches"); // Обновляем текст лейбла
+    ui->label_2->setText("   Last 10"); // Обновляем текст лейбла
     // Перезапрашиваем статистику
     QString playerId = currentPlayerId;
     if (playerId.isEmpty()) return;
@@ -539,7 +566,7 @@ void MainWindow::onFetch20MatchesClicked()
     matchKDRatios.clear();
 
     matchesToFetch = 20; // Меняем на 20 матчей
-    ui->label_2->setText("Last 20 matches"); // Обновляем текст лейбла
+    ui->label_2->setText("   Last 20"); // Обновляем текст лейбла
     // Перезапрашиваем статистику
     QString playerId = currentPlayerId;
     if (playerId.isEmpty()) return;
@@ -562,8 +589,8 @@ void MainWindow::onFetch30MatchesClicked()
     processedMatches = 0;
     matchKDRatios.clear();
 
-    matchesToFetch = 30; // Меняем на 20 матчей
-    ui->label_2->setText("Last 30 matches"); // Обновляем текст лейбла
+    matchesToFetch = 30;
+    ui->label_2->setText("   Last 30");
     // Перезапрашиваем статистику
     QString playerId = currentPlayerId;
     if (playerId.isEmpty()) return;
