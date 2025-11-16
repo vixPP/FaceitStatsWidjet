@@ -1,6 +1,7 @@
 #ifndef MAINWINDOW_H
 #define MAINWINDOW_H
 
+#include "matchwindow.h"
 #include "qlabel.h"
 #include <QMainWindow>
 #include <QNetworkAccessManager>
@@ -45,6 +46,7 @@ private slots:
     void onInternalMatchStatsFetched(QNetworkReply *reply);
     void on_Button_Save_clicked();
     void autoFetchStats();
+    void onInTheMatchhButtonClicked();
 
 private:
     Ui::MainWindow *ui;
@@ -81,6 +83,9 @@ private:
     double totalADR;
     QMap<QString, MapStats> mapStats;
     QList<double> matchKDRatios;
+
+    // Окно матча
+    MatchWindow *matchWindow;
+    QPushButton *InTheMatchhButton;
 };
 #endif // MAINWINDOW_H
-

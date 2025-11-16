@@ -20,9 +20,30 @@ MainWindow::MainWindow(QWidget *parent)
     , matchesCount(0)
     , processedMatches(0)
     , matchesToFetch(10)
-    , matchesToRequest(11)
+    , matchWindow(nullptr)
 {
     ui->setupUi(this);
+
+    InTheMatchhButton = new QPushButton("Текущий матч", this);
+    InTheMatchhButton->setGeometry(10, 400, 125, 25);
+    InTheMatchhButton->setStyleSheet(
+                "QPushButton {"
+                "    background-color: #4CAF50;"
+                "    color: black;"  // Черный текст
+                "    font-weight: bold;"
+                "    font-family: 'Arial';"  // Изменяем шрифт
+                "    font-size: 12pt;"       // Размер шрифта
+                "    border-radius: 15px;"   // Закругление углов
+                "    border: 2px solid #388E3C;"
+                "}"
+                "QPushButton:hover {"
+                "    background-color: #45A049;"
+                "}"
+                "QPushButton:pressed {"
+                "    background-color: #3D8B40;"
+                "}"
+                );
+    connect(InTheMatchhButton, &QPushButton::clicked, this, &MainWindow::onInTheMatchhButtonClicked);
 
     messageTimer = new QTimer(this);
     messageTimer->setSingleShot(true);
@@ -105,6 +126,28 @@ MainWindow::MainWindow(QWidget *parent)
 
     avatarLabel = ui->label_avatar;
     applyRoundedCorners();
+}
+
+void MainWindow::onInTheMatchhButtonClicked()
+{
+    if (!matchWindow)
+    {
+        matchWindow = new MatchWindow(this); // можно оставить родителя
+
+        matchWindow->show();
+    }
+    else
+    {
+        if (matchWindow->isHidden())
+        {
+            matchWindow->show();
+            matchWindow->activateWindow();
+        }
+        else
+        {
+            matchWindow->hide();
+        }
+    }
 }
 
 void MainWindow::autoFetchStats()
