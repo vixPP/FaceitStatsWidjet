@@ -54,13 +54,6 @@ int main(int argc, char *argv[])
     });
 
 
-    QObject::connect(&a, &QApplication::aboutToQuit, []()
-    {
-
-    });
-
-
-
     w.show();
     return a.exec();
 }

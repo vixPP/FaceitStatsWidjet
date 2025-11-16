@@ -19,6 +19,8 @@ MainWindow::MainWindow(QWidget *parent)
     , totalADR(0.0) // Инициализация
     , matchesCount(0)
     , processedMatches(0)
+    , matchesToFetch(10)
+    , matchesToRequest(11)
 {
     ui->setupUi(this);
 
@@ -66,6 +68,7 @@ MainWindow::MainWindow(QWidget *parent)
     if (!savedNickname.isEmpty())
     {
         ui->lineEditIRL->setText(savedNickname);
+        QTimer::singleShot(100, this, &MainWindow::autoFetchStats);
     }
 
 
@@ -104,6 +107,40 @@ MainWindow::MainWindow(QWidget *parent)
     applyRoundedCorners();
 }
 
+void MainWindow::autoFetchStats()
+{
+    QString nickname = ui->lineEditIRL->text().trimmed();
+    if (nickname.isEmpty())
+    {
+        return;
+    }
+
+    // Сбрасываем статистику
+    totalKills = 0;
+    totalDeaths = 0;
+    totalADR = 0.0;
+    matchesCount = 0;
+    processedMatches = 0;
+    matchKDRatios.clear();
+
+    // Устанавливаем состояние загрузки
+    ui->label_NAME->setText("Загрузка...");
+    ui->text_elo->clear();
+    ui->text_KD->clear();
+    ui->text_KR->clear();
+    ui->text_Matches->clear();
+    ui->text_AVG_LastMatches->clear();
+    ui->text_KD_LastMatches->clear();
+    ui->text_ADR_LastMatches->clear();
+    ui->text_ELO_Change->clear();
+
+    // Выполняем запрос
+    QString apiUrl = QString("https://open.faceit.com/data/v4/players?nickname=%1&game=cs2").arg(nickname);
+    QNetworkRequest request;
+    request.setUrl(QUrl(apiUrl));
+    request.setRawHeader("Authorization", QString("Bearer %1").arg(apiKey).toUtf8());
+    networkManager->get(request);
+}
 
 void MainWindow::on_Button_Save_clicked()
 {
@@ -154,8 +191,6 @@ void MainWindow::onFetchStatsClicked()
 
 void MainWindow::onRequestFinished(QNetworkReply *reply)
 {
-
-
     if (reply->error() != QNetworkReply::NoError)
     {
         ui->label_NAME->setText("Ошибка");
@@ -165,7 +200,7 @@ void MainWindow::onRequestFinished(QNetworkReply *reply)
     }
 
     QByteArray responseData = reply->readAll();
-    //qDebug().noquote() << "Player Info JSON:" << QString(responseData); //JSON otvet
+    qDebug().noquote() << "Player Info JSON:" << QString(responseData);
     reply->deleteLater();
 
     QJsonDocument jsonDoc = QJsonDocument::fromJson(responseData);
@@ -217,7 +252,9 @@ void MainWindow::onRequestFinished(QNetworkReply *reply)
     statsRequest.setRawHeader("Authorization", QString("Bearer %1").arg(apiKey).toUtf8());
     statsNetworkManager->get(statsRequest);
 
-    QString matchHistoryUrl = QString("https://open.faceit.com/data/v4/players/%1/history?game=cs2&offset=0&limit=%2").arg(playerId).arg(matchesToFetch);
+    // Запрашиваем матчи с учетом новой логики (N+1 матчей)
+    int matchesToRequest = matchesToFetch + 1;
+    QString matchHistoryUrl = QString("https://open.faceit.com/data/v4/players/%1/history?game=cs2&offset=0&limit=%2").arg(playerId).arg(matchesToRequest);
 
     QNetworkRequest matchHistoryRequest;
     matchHistoryRequest.setUrl(QUrl(matchHistoryUrl));
@@ -225,8 +262,6 @@ void MainWindow::onRequestFinished(QNetworkReply *reply)
     matchHistoryRequest.setRawHeader("Accept", "application/json");
     matchHistoryRequest.setRawHeader("User-Agent", "MyApp/1.0");
     historyNetworkManager->get(matchHistoryRequest);
-
-
 }
 
 void MainWindow::onMatchHistoryFinished(QNetworkReply *reply)
@@ -330,17 +365,17 @@ void MainWindow::onMatchHistoryFinished(QNetworkReply *reply)
 
 
 
-void MainWindow::onMatchHistoryFetched(QNetworkReply *reply) {
-    totalKills = 0;  // Сброс счётчиков
+void MainWindow::onMatchHistoryFetched(QNetworkReply *reply)
+{
+    totalKills = 0;
     matchesCount = 0;
     totalDeaths = 0;
     processedMatches = 0;
     totalADR = 0;
+    matchKDRatios.clear();
 
-    // Переменная для хранения ID последнего матча
-    QString lastMatchId;
-
-    if (reply->error() != QNetworkReply::NoError) {
+    if (reply->error() != QNetworkReply::NoError)
+    {
         ui->text_AVG_LastMatches->setText("Ошибка: " + reply->errorString());
         reply->deleteLater();
         return;
@@ -350,42 +385,81 @@ void MainWindow::onMatchHistoryFetched(QNetworkReply *reply) {
     reply->deleteLater();
 
     QJsonDocument jsonDoc = QJsonDocument::fromJson(responseData);
-    if (jsonDoc.isNull() || !jsonDoc.isObject()) {
-        qDebug().noquote() << jsonDoc.toJson(QJsonDocument::Indented);
+    if (jsonDoc.isNull() || !jsonDoc.isObject())
+    {
         ui->text_AVG_LastMatches->setText("Ошибка: некорректный JSON.");
         return;
     }
 
     QJsonObject root = jsonDoc.object();
-    if (root.contains("items") && root["items"].isArray()) {
+    QString eloMatchId; // Матч для расчета ELO (N+1 матч)
+
+    if (root.contains("items") && root["items"].isArray())
+    {
         QJsonArray matches = root["items"].toArray();
 
-        // Проходим по всем матчам и сохраняем ID последнего
-        for (const QJsonValue &matchValue : matches) {
-            if (!matchValue.isObject()) continue;
-            QJsonObject match = matchValue.toObject();
+        // Находим матч для ELO (самый старый в выборке, то есть N+1 матч)
+        if (matches.size() > matchesToFetch)
+        {
+            // Если запросили больше матчей чем нужно для статистики
+            QJsonObject eloMatch = matches.last().toObject();
+            eloMatchId = eloMatch["match_id"].toString();
+            qDebug() << "Матч для ELO (N+1):" << eloMatchId;
 
-            QString matchId = match["match_id"].toString();
-            if (!matchId.isEmpty()) {
-                // Сохраняем ID каждого матча, последний перезапишет предыдущие
-                lastMatchId = matchId;
+            // Обрабатываем только первые N матчей для статистики
+            for (int i = 0; i < matchesToFetch && i < matches.size(); i++)
+            {
+                QJsonObject match = matches[i].toObject();
+                QString matchId = match["match_id"].toString();
+                if (!matchId.isEmpty())
+                {
+                    // Запрос статистики для каждого матча (только для статистики)
+                    QString matchStatsUrl = QString("https://open.faceit.com/data/v4/matches/%1/stats").arg(matchId);
+                    QNetworkRequest matchStatsRequest;
+                    matchStatsRequest.setUrl(QUrl(matchStatsUrl));
+                    matchStatsRequest.setRawHeader("Authorization", QString("Bearer %1").arg(apiKey).toUtf8());
+                    matchStatsNetworkManager->get(matchStatsRequest);
+                }
+            }
+        }
+        else
+        {
+            // Если не хватает матчей для N+1, используем самый старый для ELO
+            if (!matches.isEmpty())
+            {
+                QJsonObject eloMatch = matches.last().toObject();
+                eloMatchId = eloMatch["match_id"].toString();
+                qDebug() << "Матч для ELO (последний доступный):" << eloMatchId;
+            }
 
-                // Запрос статистики матча
-                QString matchStatsUrl = QString("https://open.faceit.com/data/v4/matches/%1/stats").arg(matchId);
-                QNetworkRequest matchStatsRequest;
-                matchStatsRequest.setUrl(QUrl(matchStatsUrl));
-                matchStatsRequest.setRawHeader("Authorization", QString("Bearer %1").arg(apiKey).toUtf8());
-                matchStatsNetworkManager->get(matchStatsRequest);
+            // Обрабатываем все матчи для статистики
+            for (const QJsonValue &matchValue : matches)
+            {
+                if (!matchValue.isObject()) continue;
+                QJsonObject match = matchValue.toObject();
+                QString matchId = match["match_id"].toString();
+                if (!matchId.isEmpty())
+                {
+                    QString matchStatsUrl = QString("https://open.faceit.com/data/v4/matches/%1/stats").arg(matchId);
+                    QNetworkRequest matchStatsRequest;
+                    matchStatsRequest.setUrl(QUrl(matchStatsUrl));
+                    matchStatsRequest.setRawHeader("Authorization", QString("Bearer %1").arg(apiKey).toUtf8());
+                    matchStatsNetworkManager->get(matchStatsRequest);
+                }
             }
         }
 
-        // После обработки всех матчей вызываем метод для последнего
-        if (!lastMatchId.isEmpty())
+        // Для ELO используем отдельный матч
+        if (!eloMatchId.isEmpty())
         {
-            fetchInternalMatchStats(lastMatchId);
+            fetchInternalMatchStats(eloMatchId);
+        }
+        else
+        {
+            qDebug() << "Не найден матч для расчета ELO";
+            ui->text_ELO_Change->setText("ELO+:     N/A");
         }
     }
-
 }
 
 
@@ -580,12 +654,16 @@ void MainWindow::onFetch10MatchesClicked()
     processedMatches = 0;
     matchKDRatios.clear();
 
-    matchesToFetch = 10; // Меняем на 20 матчей
-    ui->label_2->setText("   Last 10"); // Обновляем текст лейбла
-    // Перезапрашиваем статистику
+    // Запрашиваем 11 матчей: 10 для статистики + 1 для ELO
+    matchesToFetch = 10; // Статистика за 10 матчей
+    int matchesToRequest = 11; // Запрашиваем 11 матчей из API
+
+    ui->label_2->setText("   Last 10");
+
     QString playerId = currentPlayerId;
     if (playerId.isEmpty()) return;
-    QString matchHistoryUrl = QString("https://open.faceit.com/data/v4/players/%1/history?game=cs2&offset=0&limit=%2").arg(playerId).arg(matchesToFetch);
+
+    QString matchHistoryUrl = QString("https://open.faceit.com/data/v4/players/%1/history?game=cs2&offset=0&limit=%2").arg(playerId).arg(matchesToRequest);
     QNetworkRequest matchHistoryRequest;
     matchHistoryRequest.setUrl(QUrl(matchHistoryUrl));
     matchHistoryRequest.setRawHeader("Authorization", QString("Bearer %1").arg(apiKey).toUtf8());
@@ -593,7 +671,6 @@ void MainWindow::onFetch10MatchesClicked()
     matchHistoryRequest.setRawHeader("User-Agent", "MyApp/1.0");
     historyNetworkManager->get(matchHistoryRequest);
 }
-
 
 void MainWindow::onFetch20MatchesClicked()
 {
@@ -614,12 +691,15 @@ void MainWindow::onFetch20MatchesClicked()
     processedMatches = 0;
     matchKDRatios.clear();
 
-    matchesToFetch = 20; // Меняем на 20 матчей
-    ui->label_2->setText("   Last 20"); // Обновляем текст лейбла
-    // Перезапрашиваем статистику
+    matchesToFetch = 20; // Статистика за 20 матчей
+    int matchesToRequest = 21; // Запрашиваем 21 матч из API
+
+    ui->label_2->setText("   Last 20");
+
     QString playerId = currentPlayerId;
     if (playerId.isEmpty()) return;
-    QString matchHistoryUrl = QString("https://open.faceit.com/data/v4/players/%1/history?game=cs2&offset=0&limit=%2").arg(playerId).arg(matchesToFetch);
+
+    QString matchHistoryUrl = QString("https://open.faceit.com/data/v4/players/%1/history?game=cs2&offset=0&limit=%2").arg(playerId).arg(matchesToRequest);
     QNetworkRequest matchHistoryRequest;
     matchHistoryRequest.setUrl(QUrl(matchHistoryUrl));
     matchHistoryRequest.setRawHeader("Authorization", QString("Bearer %1").arg(apiKey).toUtf8());
@@ -627,7 +707,6 @@ void MainWindow::onFetch20MatchesClicked()
     matchHistoryRequest.setRawHeader("User-Agent", "MyApp/1.0");
     historyNetworkManager->get(matchHistoryRequest);
 }
-
 
 void MainWindow::onFetch30MatchesClicked()
 {
@@ -648,13 +727,15 @@ void MainWindow::onFetch30MatchesClicked()
     processedMatches = 0;
     matchKDRatios.clear();
 
-    matchesToFetch = 30;
+    matchesToFetch = 30; // Статистика за 30 матчей
+    int matchesToRequest = 31; // Запрашиваем 31 матч из API
+
     ui->label_2->setText("   Last 30");
 
     QString playerId = currentPlayerId;
     if (playerId.isEmpty()) return;
 
-    QString matchHistoryUrl = QString("https://open.faceit.com/data/v4/players/%1/history?game=cs2&offset=0&limit=%2").arg(playerId).arg(matchesToFetch);
+    QString matchHistoryUrl = QString("https://open.faceit.com/data/v4/players/%1/history?game=cs2&offset=0&limit=%2").arg(playerId).arg(matchesToRequest);
     QNetworkRequest matchHistoryRequest;
     matchHistoryRequest.setUrl(QUrl(matchHistoryUrl));
     matchHistoryRequest.setRawHeader("Authorization", QString("Bearer %1").arg(apiKey).toUtf8());
@@ -666,6 +747,7 @@ void MainWindow::onFetch30MatchesClicked()
 void MainWindow::fetchInternalMatchStats(const QString &matchId)
 {
     QString internalStatsUrl = QString("https://www.faceit.com/api/stats/v3/matches/%1").arg(matchId);
+    qDebug() << "Запрашиваем ELO для матча:" << matchId;
     qDebug() << "URL: " << internalStatsUrl;
     QNetworkRequest internalStatsRequest;
     internalStatsRequest.setUrl(QUrl(internalStatsUrl));
@@ -682,6 +764,9 @@ void MainWindow::onInternalMatchStatsFetched(QNetworkReply *reply)
     }
 
     QByteArray responseData = reply->readAll();
+    qDebug().noquote() << "=== JSON СТАТИСТИКИ МАТЧА ДЛЯ ELO ===";
+    qDebug().noquote() << QString(responseData);
+    qDebug() << "==========================================";
     QJsonDocument jsonDoc = QJsonDocument::fromJson(responseData);
 
     if (jsonDoc.isNull())
@@ -753,8 +838,8 @@ void MainWindow::onInternalMatchStatsFetched(QNetworkReply *reply)
                 int EloPastGames = player.contains("elo") ? player["elo"].toInt() : -1;
                 DifElo = currentPlayerElo - EloPastGames;
 
-                //qDebug() << "Найден игрок с ELO:" << EloPastGames;
-                ui->text_ELO_Change->setText( QString("ELO:      %1%2").arg(DifElo >= 0 ? "+" : "").arg(DifElo));
+                qDebug() << "Текущее ELO:" << currentPlayerElo << "ELO в старом матче:" << EloPastGames << "Разница:" << DifElo;
+                ui->text_ELO_Change->setText( QString("ELO+:     %1%2").arg(DifElo >= 0 ? "+" : "").arg(DifElo));
 
                 reply->deleteLater();
                 return;

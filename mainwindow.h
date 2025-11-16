@@ -44,7 +44,7 @@ private slots:
     void fetchInternalMatchStats(const QString &matchId);
     void onInternalMatchStatsFetched(QNetworkReply *reply);
     void on_Button_Save_clicked();
-
+    void autoFetchStats();
 
 private:
     Ui::MainWindow *ui;
@@ -77,6 +77,7 @@ private:
     int processedMatches = 0;
     int totalDeaths = 0;
     int matchesToFetch;
+    int matchesToRequest;
     double totalADR;
     QMap<QString, MapStats> mapStats;
     QList<double> matchKDRatios;
