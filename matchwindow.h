@@ -26,6 +26,12 @@ private:
     QVBoxLayout *mainLayout;
     QPushButton *backButton;
     QLabel *infoLabel;
+    QLabel *Player1Label;
+    QLabel *Player2Label;
+    QLabel *Player3Label;
+    QLabel *Player4Label;
+    QLabel *Player5Label;
+    QLabel *Player6Label;
 };
 
 #endif // MATCHWINDOW_H

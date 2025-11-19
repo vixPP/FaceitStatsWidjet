@@ -24,16 +24,16 @@ MainWindow::MainWindow(QWidget *parent)
 {
     ui->setupUi(this);
 
-    InTheMatchhButton = new QPushButton("Текущий матч", this);
-    InTheMatchhButton->setGeometry(10, 400, 125, 25);
+    InTheMatchhButton = new QPushButton("Live match", this);
+    InTheMatchhButton->setGeometry(10, 440, 125, 25);
     InTheMatchhButton->setStyleSheet(
                 "QPushButton {"
-                "    background-color: #4CAF50;"
+                "    background-color: #c9392e;"
                 "    color: black;"  // Черный текст
                 "    font-weight: bold;"
                 "    font-family: 'Arial';"  // Изменяем шрифт
                 "    font-size: 12pt;"       // Размер шрифта
-                "    border-radius: 15px;"   // Закругление углов
+                "    border-radius: 12px;"   // Закругление углов
                 "    border: 2px solid #388E3C;"
                 "}"
                 "QPushButton:hover {"
@@ -243,7 +243,7 @@ void MainWindow::onRequestFinished(QNetworkReply *reply)
     }
 
     QByteArray responseData = reply->readAll();
-    qDebug().noquote() << "Player Info JSON:" << QString(responseData);
+    //qDebug().noquote() << "Player Info JSON:" << QString(responseData);
     reply->deleteLater();
 
     QJsonDocument jsonDoc = QJsonDocument::fromJson(responseData);
@@ -476,7 +476,7 @@ void MainWindow::onMatchHistoryFetched(QNetworkReply *reply)
             }
 
             // Обрабатываем все матчи для статистики
-            for (const QJsonValue &matchValue : matches)
+            for (const QJsonValue &matchValue : qAsConst(matches))
             {
                 if (!matchValue.isObject()) continue;
                 QJsonObject match = matchValue.toObject();
@@ -807,9 +807,9 @@ void MainWindow::onInternalMatchStatsFetched(QNetworkReply *reply)
     }
 
     QByteArray responseData = reply->readAll();
-    qDebug().noquote() << "=== JSON СТАТИСТИКИ МАТЧА ДЛЯ ELO ===";
-    qDebug().noquote() << QString(responseData);
-    qDebug() << "==========================================";
+    //qDebug().noquote() << "=== JSON СТАТИСТИКИ МАТЧА ДЛЯ ELO ===";
+    //qDebug().noquote() << QString(responseData);
+    //qDebug() << "==========================================";
     QJsonDocument jsonDoc = QJsonDocument::fromJson(responseData);
 
     if (jsonDoc.isNull())

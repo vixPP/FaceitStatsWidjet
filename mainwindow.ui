@@ -7,7 +7,7 @@
     <x>0</x>
     <y>0</y>
     <width>376</width>
-    <height>484</height>
+    <height>566</height>
    </rect>
   </property>
   <property name="font">
@@ -37,7 +37,7 @@ QWidget#centralwidget {
       <x>10</x>
       <y>190</y>
       <width>171</width>
-      <height>201</height>
+      <height>241</height>
      </rect>
     </property>
     <property name="styleSheet">
@@ -201,6 +201,40 @@ color: rgb(214, 214, 214);
       <string>Matches    ?</string>
      </property>
     </widget>
+    <widget class="QLabel" name="text_Matches_2">
+     <property name="geometry">
+      <rect>
+       <x>0</x>
+       <y>200</y>
+       <width>171</width>
+       <height>41</height>
+      </rect>
+     </property>
+     <property name="sizePolicy">
+      <sizepolicy hsizetype="Preferred" vsizetype="Preferred">
+       <horstretch>0</horstretch>
+       <verstretch>0</verstretch>
+      </sizepolicy>
+     </property>
+     <property name="font">
+      <font>
+       <family>Courier</family>
+       <pointsize>11</pointsize>
+       <bold>true</bold>
+      </font>
+     </property>
+     <property name="styleSheet">
+      <string notr="true">QLabel
+
+{
+color: rgb(214, 214, 214);
+}
+</string>
+     </property>
+     <property name="text">
+      <string>Matches    ?</string>
+     </property>
+    </widget>
    </widget>
    <widget class="QLabel" name="label_NAME">
     <property name="geometry">
@@ -260,7 +294,7 @@ background-color: #2e2e2d;
       <x>190</x>
       <y>190</y>
       <width>171</width>
-      <height>201</height>
+      <height>241</height>
      </rect>
     </property>
     <property name="styleSheet">
@@ -422,6 +456,40 @@ color: rgb(214, 214, 214);
      </property>
      <property name="text">
       <string>ELO+      ?</string>
+     </property>
+    </widget>
+    <widget class="QLabel" name="text_AVG_LastMatches_2">
+     <property name="geometry">
+      <rect>
+       <x>0</x>
+       <y>200</y>
+       <width>171</width>
+       <height>41</height>
+      </rect>
+     </property>
+     <property name="sizePolicy">
+      <sizepolicy hsizetype="Preferred" vsizetype="Preferred">
+       <horstretch>0</horstretch>
+       <verstretch>0</verstretch>
+      </sizepolicy>
+     </property>
+     <property name="font">
+      <font>
+       <family>Courier</family>
+       <pointsize>11</pointsize>
+       <bold>true</bold>
+      </font>
+     </property>
+     <property name="styleSheet">
+      <string notr="true">QLabel
+
+{
+color: rgb(214, 214, 214);
+}
+</string>
+     </property>
+     <property name="text">
+      <string>AVG.K     ?</string>
      </property>
     </widget>
    </widget>

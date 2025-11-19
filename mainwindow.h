@@ -87,5 +87,8 @@ private:
     // Окно матча
     MatchWindow *matchWindow;
     QPushButton *InTheMatchhButton;
+
+
+
 };
 #endif // MAINWINDOW_H

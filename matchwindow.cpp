@@ -61,6 +61,11 @@ void MatchWindow::setupUI()
     infoLabel->setStyleSheet("font-size: 16px; color: #666; text-align: center;");
     infoLabel->setAlignment(Qt::AlignCenter);
 
+
+    Player1Label = new QLabel("Здесь будет\n статистика\n игрока 1", this);
+    infoLabel->setStyleSheet("font-size: 16px; color: #666; text-align: center;");
+    infoLabel->setAlignment(Qt::AlignCenter);
+
     // Добавляем элементы в layout с выравниванием
     //mainLayout->addWidget(backButton, 0, Qt::AlignLeft); // ← Выравнивание по левому краю
     // или
@@ -68,7 +73,9 @@ void MatchWindow::setupUI()
     // или
     // mainLayout->addWidget(backButton, 0, Qt::AlignHCenter); // ← Выравнивание по центру
 
+
     mainLayout->addWidget(infoLabel);
+    mainLayout->addWidget(Player1Label);
     mainLayout->addStretch();
 }
 
