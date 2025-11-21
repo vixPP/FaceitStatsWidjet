@@ -10,13 +10,15 @@
 #include <QPixmap>
 #include <QMovie>
 #include <QTimer>
+#include <QLineEdit>
+#include <QRegularExpression>
 
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
     , ui(new Ui::MainWindow)
     , totalKills(0)
     , totalDeaths(0)
-    , totalADR(0.0) // Инициализация
+    , totalADR(0.0)
     , matchesCount(0)
     , processedMatches(0)
     , matchesToFetch(10)
@@ -24,26 +26,35 @@ MainWindow::MainWindow(QWidget *parent)
 {
     ui->setupUi(this);
 
-    InTheMatchhButton = new QPushButton("Live match", this);
-    InTheMatchhButton->setGeometry(10, 440, 125, 25);
-    InTheMatchhButton->setStyleSheet(
-                "QPushButton {"
-                "    background-color: #c9392e;"
-                "    color: black;"  // Черный текст
-                "    font-weight: bold;"
-                "    font-family: 'Arial';"  // Изменяем шрифт
-                "    font-size: 12pt;"       // Размер шрифта
-                "    border-radius: 12px;"   // Закругление углов
-                "    border: 2px solid #388E3C;"
-                "}"
-                "QPushButton:hover {"
-                "    background-color: #45A049;"
-                "}"
-                "QPushButton:pressed {"
-                "    background-color: #3D8B40;"
-                "}"
-                );
-    connect(InTheMatchhButton, &QPushButton::clicked, this, &MainWindow::onInTheMatchhButtonClicked);
+    // Поле для ввода ссылки на комнату
+    roomUrlEdit = new QLineEdit(this);
+    roomUrlEdit->setGeometry(10, 440, 260, 25);
+    roomUrlEdit->setPlaceholderText("Вставьте ссылку на комнату матча FaceIt...");
+    roomUrlEdit->setStyleSheet(
+        "QLineEdit {"
+        "    background-color: #2e2e2d;"
+        "    color: white;"
+        "    border: 1px solid #4CAF50;"
+        "    border-radius: 5px;"
+        "    padding: 5px;"
+        "}"
+    );
+
+    // Кнопка для загрузки комнаты
+    roomMatchButton = new QPushButton("Загрузить", this);
+    roomMatchButton->setGeometry(275, 440, 90, 25);
+    roomMatchButton->setStyleSheet(
+        "QPushButton {"
+        "    background-color: #4CAF50;"
+        "    color: white;"
+        "    font-weight: bold;"
+        "    border: none;"
+        "    border-radius: 5px;"
+        "}"
+        "QPushButton:hover { background-color: #45a049; }"
+        "QPushButton:pressed { background-color: #3d8b40; }"
+    );
+    connect(roomMatchButton, &QPushButton::clicked, this, &MainWindow::onRoomMatchButtonClicked);
 
     messageTimer = new QTimer(this);
     messageTimer->setSingleShot(true);
@@ -58,7 +69,6 @@ MainWindow::MainWindow(QWidget *parent)
     {
         ui->pushButton->setEnabled(true);
     });
-
 
     button10Timer = new QTimer(this);
     button10Timer->setSingleShot(true);
@@ -81,9 +91,6 @@ MainWindow::MainWindow(QWidget *parent)
         ui->pushButton_30->setEnabled(true);
     });
 
-
-
-
     QSettings settings("config.ini", QSettings::IniFormat);
     QString savedNickname = settings.value("Player/Nickname", "").toString();
     if (!savedNickname.isEmpty())
@@ -92,11 +99,9 @@ MainWindow::MainWindow(QWidget *parent)
         QTimer::singleShot(100, this, &MainWindow::autoFetchStats);
     }
 
-
     ui->label_NAME->setAlignment(Qt::AlignCenter);
     ui->label_NAME->setWordWrap(true);
     bestMapImageLabel = ui->label_BestMapImage;
-
 
     // Инициализация сетевых менеджеров
     networkManager = new QNetworkAccessManager(this);
@@ -123,31 +128,61 @@ MainWindow::MainWindow(QWidget *parent)
     connect(internalStatsNetworkManager, &QNetworkAccessManager::finished, this, &MainWindow::onInternalMatchStatsFetched);
     connect(ui->Button_Save, &QPushButton::clicked, this, &MainWindow::on_Button_Save_clicked);
 
-
     avatarLabel = ui->label_avatar;
     applyRoundedCorners();
 }
 
-void MainWindow::onInTheMatchhButtonClicked()
+void MainWindow::onRoomMatchButtonClicked()
 {
-    if (!matchWindow)
-    {
-        matchWindow = new MatchWindow(this); // можно оставить родителя
+    QString roomUrl = roomUrlEdit->text().trimmed();
 
-        matchWindow->show();
-    }
-    else
+    if (roomUrl.isEmpty())
     {
-        if (matchWindow->isHidden())
-        {
-            matchWindow->show();
-            matchWindow->activateWindow();
-        }
-        else
-        {
-            matchWindow->hide();
-        }
+        ui->label_Errors->setText("Введите ссылку на комнату матча");
+        return;
     }
+
+    QString matchId = extractMatchIdFromUrl(roomUrl);
+
+    if (matchId.isEmpty())
+    {
+        ui->label_Errors->setText("Неверный формат ссылки");
+        return;
+    }
+
+    qDebug() << "Loading room with match ID:" << matchId;
+
+    if (!matchWindow) {
+        matchWindow = new MatchWindow(apiKey, this);
+        connect(matchWindow, &MatchWindow::destroyed, this, [this]() {
+            matchWindow = nullptr;
+        });
+    }
+
+    matchWindow->loadMatchById(matchId, currentPlayerId);
+    matchWindow->show();
+    matchWindow->activateWindow();
+
+    //ui->label_Errors->setText("Загрузка комнаты...");
+}
+
+QString MainWindow::extractMatchIdFromUrl(const QString &url)
+{
+    QRegularExpression regex("room/1-([a-f0-9-]+)");
+    QRegularExpressionMatch match = regex.match(url);
+
+    if (match.hasMatch()) {
+        return "1-" + match.captured(1);
+    }
+
+    QRegularExpression regex2("room/([a-f0-9-]+)");
+    QRegularExpressionMatch match2 = regex2.match(url);
+
+    if (match2.hasMatch()) {
+        return match2.captured(1);
+    }
+
+    return "";
 }
 
 void MainWindow::autoFetchStats()
@@ -158,7 +193,6 @@ void MainWindow::autoFetchStats()
         return;
     }
 
-    // Сбрасываем статистику
     totalKills = 0;
     totalDeaths = 0;
     totalADR = 0.0;
@@ -166,7 +200,6 @@ void MainWindow::autoFetchStats()
     processedMatches = 0;
     matchKDRatios.clear();
 
-    // Устанавливаем состояние загрузки
     ui->label_NAME->setText("Загрузка...");
     ui->text_elo->clear();
     ui->text_KD->clear();
@@ -177,7 +210,6 @@ void MainWindow::autoFetchStats()
     ui->text_ADR_LastMatches->clear();
     ui->text_ELO_Change->clear();
 
-    // Выполняем запрос
     QString apiUrl = QString("https://open.faceit.com/data/v4/players?nickname=%1&game=cs2").arg(nickname);
     QNetworkRequest request;
     request.setUrl(QUrl(apiUrl));
@@ -214,7 +246,6 @@ void MainWindow::onFetchStatsClicked()
         return;
     }
 
-    // Блокировка UI на время запроса
     ui->pushButton->setEnabled(false);
     buttonSearcheTimer->start(3000);
 
@@ -231,7 +262,6 @@ void MainWindow::onFetchStatsClicked()
     networkManager->get(request);
 }
 
-
 void MainWindow::onRequestFinished(QNetworkReply *reply)
 {
     if (reply->error() != QNetworkReply::NoError)
@@ -243,7 +273,6 @@ void MainWindow::onRequestFinished(QNetworkReply *reply)
     }
 
     QByteArray responseData = reply->readAll();
-    //qDebug().noquote() << "Player Info JSON:" << QString(responseData);
     reply->deleteLater();
 
     QJsonDocument jsonDoc = QJsonDocument::fromJson(responseData);
@@ -264,7 +293,6 @@ void MainWindow::onRequestFinished(QNetworkReply *reply)
     currentPlayerId = playerId;
     ui->label_NAME->setText(jsonObj["nickname"].toString());
 
-    // ELO
     if (jsonObj.contains("games") && jsonObj["games"].isObject())
     {
         QJsonObject games = jsonObj["games"].toObject();
@@ -279,7 +307,6 @@ void MainWindow::onRequestFinished(QNetworkReply *reply)
         }
     }
 
-    // Аватар
     QString avatarUrl = jsonObj["avatar"].toString();
     if (!avatarUrl.isEmpty())
     {
@@ -288,14 +315,12 @@ void MainWindow::onRequestFinished(QNetworkReply *reply)
         avatarNetworkManager->get(avatarRequest);
     }
 
-    // Статистика
     QString statsUrl = QString("https://open.faceit.com/data/v4/players/%1/stats/cs2").arg(playerId);
     QNetworkRequest statsRequest;
     statsRequest.setUrl(QUrl(statsUrl));
     statsRequest.setRawHeader("Authorization", QString("Bearer %1").arg(apiKey).toUtf8());
     statsNetworkManager->get(statsRequest);
 
-    // Запрашиваем матчи с учетом новой логики (N+1 матчей)
     int matchesToRequest = matchesToFetch + 1;
     QString matchHistoryUrl = QString("https://open.faceit.com/data/v4/players/%1/history?game=cs2&offset=0&limit=%2").arg(playerId).arg(matchesToRequest);
 
@@ -316,7 +341,6 @@ void MainWindow::onMatchHistoryFinished(QNetworkReply *reply)
         return;
     }
     QByteArray responseData = reply->readAll();
-    //qDebug().noquote() <<  "Player Stats JSON:" << QString(responseData);
     reply->deleteLater();
     QJsonDocument jsonDoc = QJsonDocument::fromJson(responseData);
     if (jsonDoc.isNull() || !jsonDoc.isObject())
@@ -326,7 +350,6 @@ void MainWindow::onMatchHistoryFinished(QNetworkReply *reply)
     }
     QJsonObject root = jsonDoc.object();
 
-    // Обработка статистики по картам
     if (root.contains("segments") && root["segments"].isArray())
     {
         QJsonArray segments = root["segments"].toArray();
@@ -345,11 +368,9 @@ void MainWindow::onMatchHistoryFinished(QNetworkReply *reply)
             {
                 QJsonObject stats = segment["stats"].toObject();
 
-
                 if (stats.contains("Average K/D Ratio"))
                 {
                     double kdRatio = stats["Average K/D Ratio"].toString().toDouble();
-
 
                     if (kdRatio > bestKDRatio)
                     {
@@ -360,15 +381,12 @@ void MainWindow::onMatchHistoryFinished(QNetworkReply *reply)
                         TotalMatches = stats["Total Matches"].toString().toInt();
                         winRate = stats["Win Rate %"].toString().toDouble();
                     }
-
                 }
-
             }
         }
 
         if (!bestMap.isEmpty())
         {
-
             ui->text_BestMapName->setText(QString("%1").arg(bestMap));
             ui->Text_KD_BestMap->setText(QString("KD:      %2").arg(bestKDRatio, 0, 'f', 2));
             ui->Text_AVGK_BestMap->setText(QString("AVG.K:   %1").arg(AVGK, 0, 'f', 1));
@@ -384,7 +402,6 @@ void MainWindow::onMatchHistoryFinished(QNetworkReply *reply)
         }
     }
 
-    // Остальная логика обработки статистики
     if (root.contains("lifetime") && root["lifetime"].isObject())
     {
         QJsonObject lifetime = root["lifetime"].toObject();
@@ -405,8 +422,6 @@ void MainWindow::onMatchHistoryFinished(QNetworkReply *reply)
         }
     }
 }
-
-
 
 void MainWindow::onMatchHistoryFetched(QNetworkReply *reply)
 {
@@ -435,28 +450,24 @@ void MainWindow::onMatchHistoryFetched(QNetworkReply *reply)
     }
 
     QJsonObject root = jsonDoc.object();
-    QString eloMatchId; // Матч для расчета ELO (N+1 матч)
+    QString eloMatchId;
 
     if (root.contains("items") && root["items"].isArray())
     {
         QJsonArray matches = root["items"].toArray();
 
-        // Находим матч для ELO (самый старый в выборке, то есть N+1 матч)
         if (matches.size() > matchesToFetch)
         {
-            // Если запросили больше матчей чем нужно для статистики
             QJsonObject eloMatch = matches.last().toObject();
             eloMatchId = eloMatch["match_id"].toString();
             qDebug() << "Матч для ELO (N+1):" << eloMatchId;
 
-            // Обрабатываем только первые N матчей для статистики
             for (int i = 0; i < matchesToFetch && i < matches.size(); i++)
             {
                 QJsonObject match = matches[i].toObject();
                 QString matchId = match["match_id"].toString();
                 if (!matchId.isEmpty())
                 {
-                    // Запрос статистики для каждого матча (только для статистики)
                     QString matchStatsUrl = QString("https://open.faceit.com/data/v4/matches/%1/stats").arg(matchId);
                     QNetworkRequest matchStatsRequest;
                     matchStatsRequest.setUrl(QUrl(matchStatsUrl));
@@ -467,7 +478,6 @@ void MainWindow::onMatchHistoryFetched(QNetworkReply *reply)
         }
         else
         {
-            // Если не хватает матчей для N+1, используем самый старый для ELO
             if (!matches.isEmpty())
             {
                 QJsonObject eloMatch = matches.last().toObject();
@@ -475,8 +485,7 @@ void MainWindow::onMatchHistoryFetched(QNetworkReply *reply)
                 qDebug() << "Матч для ELO (последний доступный):" << eloMatchId;
             }
 
-            // Обрабатываем все матчи для статистики
-            for (const QJsonValue &matchValue : qAsConst(matches))
+            for (const QJsonValue &matchValue : matches)
             {
                 if (!matchValue.isObject()) continue;
                 QJsonObject match = matchValue.toObject();
@@ -492,7 +501,6 @@ void MainWindow::onMatchHistoryFetched(QNetworkReply *reply)
             }
         }
 
-        // Для ELO используем отдельный матч
         if (!eloMatchId.isEmpty())
         {
             fetchInternalMatchStats(eloMatchId);
@@ -504,8 +512,6 @@ void MainWindow::onMatchHistoryFetched(QNetworkReply *reply)
         }
     }
 }
-
-
 
 void MainWindow::onMatchStatsFetched(QNetworkReply *reply)
 {
@@ -583,12 +589,10 @@ void MainWindow::onMatchStatsFetched(QNetworkReply *reply)
 
     if (playerFoundInMatch)
     {
-
         matchesCount++;
         matchKDRatio = (matchDeaths == 0) ? matchKills : static_cast<double>(matchKills) / matchDeaths;
         matchKDRatios.append(matchKDRatio);
 
-        // Подсчёт и вывод KD за 10, 20, 30 матчей
         if (matchesCount == 10 || matchesCount == 20 || matchesCount == 30)
         {
             double totalKD = (totalDeaths == 0) ? totalKills : static_cast<double>(totalKills) / totalDeaths;
@@ -615,10 +619,7 @@ void MainWindow::onMatchStatsFetched(QNetworkReply *reply)
             ui->text_AVG_LastMatches->setText("Нет данных о матчах.");
         }
     }
-    //onRequestFinished(reply);
 }
-
-
 
 void MainWindow::onAvatarDownloaded(QNetworkReply *reply)
 {
@@ -650,7 +651,6 @@ void MainWindow::onAvatarDownloaded(QNetworkReply *reply)
     reply->deleteLater();
 }
 
-
 void MainWindow::onBestMapImageDownloaded(QNetworkReply *reply)
 {
     if (reply->error() != QNetworkReply::NoError)
@@ -680,12 +680,10 @@ void MainWindow::onBestMapImageDownloaded(QNetworkReply *reply)
 
 void MainWindow::onFetch10MatchesClicked()
 {
-    // Блокируем все кнопки
     ui->pushButton_10->setEnabled(false);
     ui->pushButton_20->setEnabled(false);
     ui->pushButton_30->setEnabled(false);
 
-    // Запускаем таймеры для всех кнопок
     button10Timer->start(3000);
     button20Timer->start(3000);
     button30Timer->start(3000);
@@ -697,9 +695,8 @@ void MainWindow::onFetch10MatchesClicked()
     processedMatches = 0;
     matchKDRatios.clear();
 
-    // Запрашиваем 11 матчей: 10 для статистики + 1 для ELO
-    matchesToFetch = 10; // Статистика за 10 матчей
-    int matchesToRequest = 11; // Запрашиваем 11 матчей из API
+    matchesToFetch = 10;
+    int matchesToRequest = 11;
 
     ui->label_2->setText("   Last 10");
 
@@ -717,12 +714,10 @@ void MainWindow::onFetch10MatchesClicked()
 
 void MainWindow::onFetch20MatchesClicked()
 {
-    // Блокируем все кнопки
     ui->pushButton_10->setEnabled(false);
     ui->pushButton_20->setEnabled(false);
     ui->pushButton_30->setEnabled(false);
 
-    // Запускаем таймеры для всех кнопок
     button10Timer->start(3000);
     button20Timer->start(3000);
     button30Timer->start(3000);
@@ -734,8 +729,8 @@ void MainWindow::onFetch20MatchesClicked()
     processedMatches = 0;
     matchKDRatios.clear();
 
-    matchesToFetch = 20; // Статистика за 20 матчей
-    int matchesToRequest = 21; // Запрашиваем 21 матч из API
+    matchesToFetch = 20;
+    int matchesToRequest = 21;
 
     ui->label_2->setText("   Last 20");
 
@@ -753,12 +748,10 @@ void MainWindow::onFetch20MatchesClicked()
 
 void MainWindow::onFetch30MatchesClicked()
 {
-    // Блокируем все кнопки
     ui->pushButton_10->setEnabled(false);
     ui->pushButton_20->setEnabled(false);
     ui->pushButton_30->setEnabled(false);
 
-    // Запускаем таймеры для всех кнопок
     button10Timer->start(3000);
     button20Timer->start(3000);
     button30Timer->start(3000);
@@ -770,8 +763,8 @@ void MainWindow::onFetch30MatchesClicked()
     processedMatches = 0;
     matchKDRatios.clear();
 
-    matchesToFetch = 30; // Статистика за 30 матчей
-    int matchesToRequest = 31; // Запрашиваем 31 матч из API
+    matchesToFetch = 30;
+    int matchesToRequest = 31;
 
     ui->label_2->setText("   Last 30");
 
@@ -791,7 +784,6 @@ void MainWindow::fetchInternalMatchStats(const QString &matchId)
 {
     QString internalStatsUrl = QString("https://www.faceit.com/api/stats/v3/matches/%1").arg(matchId);
     qDebug() << "Запрашиваем ELO для матча:" << matchId;
-    qDebug() << "URL: " << internalStatsUrl;
     QNetworkRequest internalStatsRequest;
     internalStatsRequest.setUrl(QUrl(internalStatsUrl));
     internalStatsNetworkManager->get(internalStatsRequest);
@@ -807,9 +799,6 @@ void MainWindow::onInternalMatchStatsFetched(QNetworkReply *reply)
     }
 
     QByteArray responseData = reply->readAll();
-    //qDebug().noquote() << "=== JSON СТАТИСТИКИ МАТЧА ДЛЯ ELO ===";
-    //qDebug().noquote() << QString(responseData);
-    //qDebug() << "==========================================";
     QJsonDocument jsonDoc = QJsonDocument::fromJson(responseData);
 
     if (jsonDoc.isNull())
@@ -844,7 +833,6 @@ void MainWindow::onInternalMatchStatsFetched(QNetworkReply *reply)
 
     QJsonArray teams = match["teams"].toArray();
     QString targetPlayerId = currentPlayerId.trimmed();
-    //qDebug() << "Ищем игрока с ID:" << targetPlayerId;
 
     for (const QJsonValue &teamValue : teams)
     {
@@ -852,17 +840,13 @@ void MainWindow::onInternalMatchStatsFetched(QNetworkReply *reply)
             continue;
 
         QJsonObject team = teamValue.toObject();
-        //QString teamName = team.contains("teamName") ? team["teamName"].toString() : "Unknown Team";
-        //qDebug() << "Команда:" << teamName;
 
         if (!team.contains("players") || !team["players"].isArray())
         {
-            //qDebug() << "  В команде" << teamName << "нет ключа 'players' или он не является массивом.";
             continue;
         }
 
         QJsonArray players = team["players"].toArray();
-        //qDebug() << "  Количество игроков в команде:" << players.size();
 
         for (const QJsonValue &playerValue : players)
         {
@@ -870,10 +854,7 @@ void MainWindow::onInternalMatchStatsFetched(QNetworkReply *reply)
                 continue;
 
             QJsonObject player = playerValue.toObject();
-           // QString nickname = player.contains("nickname") ? player["nickname"].toString() : "Unknown Player";
             QString playerId = player.contains("playerId") ? player["playerId"].toString().trimmed() : "Unknown ID";
-
-            //qDebug() << "  Игрок:" << nickname << "с ID:" << playerId;
 
             if (playerId == targetPlayerId)
             {
@@ -893,10 +874,7 @@ void MainWindow::onInternalMatchStatsFetched(QNetworkReply *reply)
     qDebug() << "Игрок не найден в этом матче. PlayerId:" << targetPlayerId;
     ui->text_ELO_Change->setText("Игрок не найден в этом матче.");
     reply->deleteLater();
-    //onRequestFinished(reply);
 }
-
-
 
 void MainWindow::applyRoundedCorners()
 {

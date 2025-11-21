@@ -8,6 +8,8 @@
 #include <QNetworkReply>
 #include <QSettings>
 #include <QTimer>
+#include <QLineEdit>
+#include <QPushButton>
 
 QT_BEGIN_NAMESPACE
 namespace Ui { class MainWindow; }
@@ -30,7 +32,6 @@ public:
     ~MainWindow();
     void applyRoundedCorners();
 
-
 private slots:
     void onFetchStatsClicked();
     void onRequestFinished(QNetworkReply *reply);
@@ -46,7 +47,7 @@ private slots:
     void onInternalMatchStatsFetched(QNetworkReply *reply);
     void on_Button_Save_clicked();
     void autoFetchStats();
-    void onInTheMatchhButtonClicked();
+    void onRoomMatchButtonClicked();
 
 private:
     Ui::MainWindow *ui;
@@ -59,7 +60,7 @@ private:
     QNetworkAccessManager *internalStatsNetworkManager;
 
     QString currentPlayerId;
-    QString apiKey = "7334b675-bf37-41a3-9f37-df39acb05fba"; // Перенесено в поле класса
+    QString apiKey = "7334b675-bf37-41a3-9f37-df39acb05fba";
     QLabel *avatarLabel;
     QLabel *text_KR;
     QLabel *bestMapImageLabel;
@@ -73,7 +74,7 @@ private:
     QTimer *button20Timer;
     QTimer *button30Timer;
     QTimer *messageTimer;
-    int currentPlayerElo; // Текущее ELO игрока
+    int currentPlayerElo;
     int totalKills = 0;
     int matchesCount = 0;
     int processedMatches = 0;
@@ -84,11 +85,11 @@ private:
     QMap<QString, MapStats> mapStats;
     QList<double> matchKDRatios;
 
-    // Окно матча
     MatchWindow *matchWindow;
-    QPushButton *InTheMatchhButton;
+    QPushButton *roomMatchButton;
+    QLineEdit *roomUrlEdit;
 
-
-
+    QString extractMatchIdFromUrl(const QString &url);
 };
+
 #endif // MAINWINDOW_H
