@@ -201,10 +201,10 @@ void MainWindow::autoFetchStats()
     matchKDRatios.clear();
 
     ui->label_NAME->setText("Загрузка...");
-    ui->text_elo->clear();
-    ui->text_KD->clear();
-    ui->text_KR->clear();
-    ui->text_Matches->clear();
+    ui->text_ALLelo->clear();
+    ui->text_ALLKD->clear();
+    ui->text_ALLKR->clear();
+    ui->text_ALLMatches->clear();
     ui->text_AVG_LastMatches->clear();
     ui->text_KD_LastMatches->clear();
     ui->text_ADR_LastMatches->clear();
@@ -250,10 +250,10 @@ void MainWindow::onFetchStatsClicked()
     buttonSearcheTimer->start(3000);
 
     ui->label_NAME->setText("Загрузка...");
-    ui->text_elo->clear();
-    ui->text_KD->clear();
-    ui->text_KR->clear();
-    ui->text_Matches->clear();
+    ui->text_ALLelo->clear();
+    ui->text_ALLKD->clear();
+    ui->text_ALLKR->clear();
+    ui->text_ALLMatches->clear();
 
     QString apiUrl = QString("https://open.faceit.com/data/v4/players?nickname=%1&game=cs2").arg(nickname);
     QNetworkRequest request;
@@ -267,7 +267,7 @@ void MainWindow::onRequestFinished(QNetworkReply *reply)
     if (reply->error() != QNetworkReply::NoError)
     {
         ui->label_NAME->setText("Ошибка");
-        ui->text_elo->setText("Ошибка: " + reply->errorString());
+        ui->text_ALLelo->setText("Ошибка: " + reply->errorString());
         reply->deleteLater();
         return;
     }
@@ -278,7 +278,7 @@ void MainWindow::onRequestFinished(QNetworkReply *reply)
     QJsonDocument jsonDoc = QJsonDocument::fromJson(responseData);
     if (jsonDoc.isNull() || !jsonDoc.isObject())
     {
-        ui->text_elo->setText("Ошибка: некорректный JSON.");
+        ui->text_ALLelo->setText("Ошибка: некорректный JSON.");
         return;
     }
 
@@ -286,7 +286,7 @@ void MainWindow::onRequestFinished(QNetworkReply *reply)
     QString playerId = jsonObj["player_id"].toString();
     if (playerId.isEmpty())
     {
-        ui->text_elo->setText("Игрок не найден.");
+        ui->text_ALLelo->setText("Игрок не найден.");
         return;
     }
 
@@ -302,7 +302,7 @@ void MainWindow::onRequestFinished(QNetworkReply *reply)
             if (cs2.contains("faceit_elo"))
             {
                 currentPlayerElo = cs2["faceit_elo"].toInt();
-                ui->text_elo->setText(QString("ELO:      %1").arg(currentPlayerElo));
+                ui->text_ALLelo->setText(QString("ELO:      %1").arg(currentPlayerElo));
             }
         }
     }
@@ -336,16 +336,19 @@ void MainWindow::onMatchHistoryFinished(QNetworkReply *reply)
 {
     if (reply->error() != QNetworkReply::NoError)
     {
-        ui->text_KD->setText("Ошибка: " + reply->errorString());
+        ui->text_ALLKD->setText("Ошибка: " + reply->errorString());
         reply->deleteLater();
         return;
     }
     QByteArray responseData = reply->readAll();
+    qDebug() << "=== RAW JSON RESPONSE ===";
+    qDebug() << QString::fromUtf8(responseData);
+    qDebug() << "=== END RAW JSON ===";
     reply->deleteLater();
     QJsonDocument jsonDoc = QJsonDocument::fromJson(responseData);
     if (jsonDoc.isNull() || !jsonDoc.isObject())
     {
-        ui->text_KD->setText("Ошибка: некорректный JSON.");
+        ui->text_ALLKD->setText("Ошибка: некорректный JSON.");
         return;
     }
     QJsonObject root = jsonDoc.object();
@@ -358,7 +361,7 @@ void MainWindow::onMatchHistoryFinished(QNetworkReply *reply)
         QString bestMapImageUrl;
         double AVGK = 0.0;
         int TotalMatches = 0;
-        double winRate = 0.0;
+        double winRate = 0.0; // ИЗМЕНИТЕ НА double
 
         for (const QJsonValue &segmentValue : segments)
         {
@@ -379,6 +382,7 @@ void MainWindow::onMatchHistoryFinished(QNetworkReply *reply)
                         bestMapImageUrl = segment["img_regular"].toString();
                         AVGK = stats["Average Kills"].toString().toDouble();
                         TotalMatches = stats["Total Matches"].toString().toInt();
+                        // ИСПОЛЬЗУЙТЕ toDouble() для винрейта
                         winRate = stats["Win Rate %"].toString().toDouble();
                     }
                 }
@@ -391,14 +395,7 @@ void MainWindow::onMatchHistoryFinished(QNetworkReply *reply)
             ui->Text_KD_BestMap->setText(QString("KD:      %2").arg(bestKDRatio, 0, 'f', 2));
             ui->Text_AVGK_BestMap->setText(QString("AVG.K:   %1").arg(AVGK, 0, 'f', 1));
             ui->TotalOnBestMapMatches->setText(QString("Matches: %1").arg(TotalMatches));
-            ui->Text_WInRate_BestMap->setText(QString("W.Rate:  %1").arg(winRate));
-
-            if (!bestMapImageUrl.isEmpty())
-            {
-                QNetworkRequest imageRequest;
-                imageRequest.setUrl(QUrl(bestMapImageUrl));
-                bestMapImageNetworkManager->get(imageRequest);
-            }
+            ui->Text_WInRate_BestMap->setText(QString("W.Rate:  %1%").arg(winRate, 0, 'f', 1)); // ДОБАВЬТЕ % В ВЫВОД
         }
     }
 
@@ -408,18 +405,25 @@ void MainWindow::onMatchHistoryFinished(QNetworkReply *reply)
         if (lifetime.contains("ADR"))
         {
             double adr = lifetime["ADR"].toString().toDouble();
-            ui->text_KR->setText(QString("ADR:      %1").arg(adr, 0, 'f', 2));
+            ui->text_ALLKR->setText(QString("ADR:      %1").arg(adr, 0, 'f', 2));
         }
         if (lifetime.contains("Average K/D Ratio"))
         {
             double kdRatio = lifetime["Average K/D Ratio"].toString().toDouble();
-            ui->text_KD->setText(QString("KD:       %1").arg(kdRatio, 0, 'f', 2));
+            ui->text_ALLKD->setText(QString("KD:       %1").arg(kdRatio, 0, 'f', 2));
         }
         if (lifetime.contains("Matches"))
         {
             int matches = lifetime["Matches"].toString().toInt();
-            ui->text_Matches->setText(QString("Matches:  %1").arg(matches));
+            ui->text_ALLMatches->setText(QString("Matches:  %1").arg(matches));
         }
+        if (lifetime.contains("Win Rate %"))
+        {
+            double winRate = lifetime["Win Rate %"].toString().toDouble(); // ИСПОЛЬЗУЙТЕ toDouble()
+            ui->text_ALLWINR->setText(QString("W.Rate:   %1%").arg(winRate, 0, 'f', 1));
+        }
+        // ДОБАВЬТЕ ОТЛАДОЧНЫЙ ВЫВОД ДЛЯ ПРОВЕРКИ КЛЮЧЕЙ
+        qDebug() << "Lifetime keys:" << lifetime.keys();
     }
 }
 
@@ -596,12 +600,12 @@ void MainWindow::onMatchStatsFetched(QNetworkReply *reply)
         if (matchesCount == 10 || matchesCount == 20 || matchesCount == 30)
         {
             double totalKD = (totalDeaths == 0) ? totalKills : static_cast<double>(totalKills) / totalDeaths;
-            qDebug().noquote() << QString("Общий KD за %1 матчей: %2").arg(matchesCount).arg(totalKD, 0, 'f', 2);
+            //qDebug().noquote() << QString("Общий KD за %1 матчей: %2").arg(matchesCount).arg(totalKD, 0, 'f', 2);
         }
     }
 
     processedMatches++;
-    qDebug() << "Processed:" << processedMatches << "Matches Count:" << matchesCount;
+    //qDebug() << "Processed:" << processedMatches << "Matches Count:" << matchesCount;
 
     if (processedMatches == matchesToFetch)
     {

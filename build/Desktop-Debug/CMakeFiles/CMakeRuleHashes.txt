@@ -1,0 +1,5 @@
+# Hashes of file build rules.
+c4a3a2cb066cafd64666ea35a2e8abb1 CMakeFiles/FaceitUrStats_autogen
+c4a3a2cb066cafd64666ea35a2e8abb1 CMakeFiles/FaceitUrStats_autogen_timestamp_deps
+32203c13ce888de08707218d636b85c1 FaceitUrStats_autogen/timestamp
+73f0893acd450327bcc1d4086d50019f qrc_resources.cpp

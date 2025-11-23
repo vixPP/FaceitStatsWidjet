@@ -10,6 +10,7 @@
 #include <QNetworkReply>
 #include <QScrollArea>
 #include <QProgressBar>
+#include <QRegularExpression>
 
 class MatchWindow : public QMainWindow
 {
@@ -24,13 +25,11 @@ public:
 private slots:
     void onBackButtonClicked();
     void onMatchDataLoaded(QNetworkReply *reply);
-    void onMatchStatsLoaded(QNetworkReply *reply);
     void onPlayerStatsLoaded(QNetworkReply *reply);
 
 private:
     void setupUI();
     void displayMatchInfo(const QJsonObject &matchData);
-
     void fetchPlayerStats(const QString &playerId, const QString &nickname, const QString &mapName);
     void processAllPlayerStats();
     void setupConnections();
@@ -64,9 +63,9 @@ private:
     int totalPlayersToLoad = 0;
     int loadedPlayersCount = 0;
 
-    QMap<QString, QString> playerTeamMap; // playerId -> teamName
-        QString team1Name;
-        QString team2Name;
+    QMap<QString, QString> playerTeamMap;
+    QString team1Name;
+    QString team2Name;
 };
 
 #endif // MATCHWINDOW_H

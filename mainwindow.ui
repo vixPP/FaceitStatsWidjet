@@ -83,7 +83,7 @@ color: #a3520f;
       <string>   All time </string>
      </property>
     </widget>
-    <widget class="QLabel" name="text_elo">
+    <widget class="QLabel" name="text_ALLelo">
      <property name="geometry">
       <rect>
        <x>0</x>
@@ -111,7 +111,7 @@ color: rgb(214, 214, 214);
       <string>ELO        ?</string>
      </property>
     </widget>
-    <widget class="QLabel" name="text_KD">
+    <widget class="QLabel" name="text_ALLKD">
      <property name="geometry">
       <rect>
        <x>0</x>
@@ -139,7 +139,7 @@ color: rgb(214, 214, 214);
       <string>KD         ?</string>
      </property>
     </widget>
-    <widget class="QLabel" name="text_KR">
+    <widget class="QLabel" name="text_ALLKR">
      <property name="geometry">
       <rect>
        <x>0</x>
@@ -167,7 +167,7 @@ color: rgb(214, 214, 214);
       <string>ADR        ?</string>
      </property>
     </widget>
-    <widget class="QLabel" name="text_Matches">
+    <widget class="QLabel" name="text_ALLMatches">
      <property name="geometry">
       <rect>
        <x>0</x>
@@ -201,7 +201,7 @@ color: rgb(214, 214, 214);
       <string>Matches    ?</string>
      </property>
     </widget>
-    <widget class="QLabel" name="text_Matches_2">
+    <widget class="QLabel" name="text_ALLWINR">
      <property name="geometry">
       <rect>
        <x>0</x>
@@ -232,7 +232,7 @@ color: rgb(214, 214, 214);
 </string>
      </property>
      <property name="text">
-      <string>WIN R.     55%</string>
+      <string>WIN R.     ?</string>
      </property>
     </widget>
    </widget>
@@ -949,7 +949,7 @@ color: #1a1715;
      <x>0</x>
      <y>0</y>
      <width>376</width>
-     <height>21</height>
+     <height>23</height>
     </rect>
    </property>
   </widget>

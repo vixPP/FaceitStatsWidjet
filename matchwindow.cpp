@@ -5,6 +5,7 @@
 #include <QApplication>
 #include <QDebug>
 #include <QScrollArea>
+#include <QRegularExpression>
 
 MatchWindow::MatchWindow(const QString &apiKey, QWidget *parent)
     : QMainWindow(parent)
@@ -13,7 +14,7 @@ MatchWindow::MatchWindow(const QString &apiKey, QWidget *parent)
     , team2Name("Команда 2")
 {
     networkManager = new QNetworkAccessManager(this);
-    setupConnections(); // Используем функцию для настройки соединений
+    setupConnections();
 
     setupUI();
 
@@ -23,7 +24,6 @@ MatchWindow::MatchWindow(const QString &apiKey, QWidget *parent)
     move(1020, 440);
 }
 
-// Новая функция для настройки соединений
 void MatchWindow::setupConnections()
 {
     disconnect(networkManager, &QNetworkAccessManager::finished, this, nullptr);
@@ -39,7 +39,6 @@ void MatchWindow::loadMatchById(const QString &matchId, const QString &playerId)
     loadedPlayersCount = 0;
     totalPlayersToLoad = 0;
 
-    // Сбрасываем соединения к начальному состоянию
     setupConnections();
 
     QString url = QString("https://open.faceit.com/data/v4/matches/%1").arg(matchId);
@@ -77,58 +76,33 @@ void MatchWindow::onMatchDataLoaded(QNetworkReply *reply)
     QJsonObject matchData = jsonDoc.object();
     displayMatchInfo(matchData);
 
-    if (!currentMatchId.isEmpty())
-    {
-        QString statsUrl = QString("https://open.faceit.com/data/v4/matches/%1/stats").arg(currentMatchId);
-        QNetworkRequest statsRequest;
-        statsRequest.setUrl(QUrl(statsUrl));
-        statsRequest.setRawHeader("Authorization", QString("Bearer %1").arg(apiKey).toUtf8());
-
-        // Меняем соединение для загрузки статистики матча
-        disconnect(networkManager, &QNetworkAccessManager::finished, this, &MatchWindow::onMatchDataLoaded);
-        connect(networkManager, &QNetworkAccessManager::finished, this, &MatchWindow::onMatchStatsLoaded);
-
-        networkManager->get(statsRequest);
-    }
-}
-
-void MatchWindow::onMatchStatsLoaded(QNetworkReply *reply)
-{
-    if (reply->error() != QNetworkReply::NoError)
-    {
-        qDebug() << "Match stats error:" << reply->errorString();
-        playerStatsLabel->setText(playerStatsLabel->text() + "\n\n❌ Ошибка загрузки статистики");
-        reply->deleteLater();
-
-        // Восстанавливаем соединение даже при ошибке
-        setupConnections();
-        return;
-    }
-
-    QByteArray responseData = reply->readAll();
-    QJsonDocument jsonDoc = QJsonDocument::fromJson(responseData);
-    reply->deleteLater();
-
-    // Начинаем загрузку статистики игроков на этой карте
-    if (!currentMapName.isEmpty() && !playerStatsMap.isEmpty())
+    // После отображения основной информации начинаем загрузку статистики игроков
+    if (!currentMapName.isEmpty() && !playerStatsMap.isEmpty() && currentMapName != "Неизвестно")
     {
         // Меняем соединение для загрузки статистики игроков
-        disconnect(networkManager, &QNetworkAccessManager::finished, this, &MatchWindow::onMatchStatsLoaded);
+        disconnect(networkManager, &QNetworkAccessManager::finished, this, &MatchWindow::onMatchDataLoaded);
         connect(networkManager, &QNetworkAccessManager::finished, this, &MatchWindow::onPlayerStatsLoaded);
 
         // Загружаем статистику для каждого игрока
-        loadedPlayersCount = 0; // Сбрасываем счетчик
+        loadedPlayersCount = 0;
+        totalPlayersToLoad = playerStatsMap.size();
+
         for (auto it = playerStatsMap.begin(); it != playerStatsMap.end(); ++it)
         {
             fetchPlayerStats(it.key(), it.value().nickname, currentMapName);
         }
 
         progressBar->setVisible(true);
-        progressBar->setMaximum(playerStatsMap.size());
+        progressBar->setMaximum(totalPlayersToLoad);
         progressBar->setValue(0);
-    } else
+
+        infoLabel->setText(infoLabel->text() + "\n\n📊 Загрузка статистики игроков на карте " + currentMapName + "...");
+    }
+    else
     {
-        // Если нет карты или игроков, восстанавливаем соединение
+        if (currentMapName == "Неизвестно") {
+            infoLabel->setText(infoLabel->text() + "\n\n❌ Не удалось определить карту для загрузки статистики");
+        }
         setupConnections();
     }
 }
@@ -138,15 +112,15 @@ void MatchWindow::onPlayerStatsLoaded(QNetworkReply *reply)
     if (reply->error() != QNetworkReply::NoError)
     {
         qDebug() << "Player stats error:" << reply->errorString();
-        loadedPlayersCount++; // Все равно увеличиваем счетчик
+        loadedPlayersCount++;
         progressBar->setValue(loadedPlayersCount);
         reply->deleteLater();
 
-        // Проверяем, все ли загружено
+        // Проверяем, все ли загрузки завершены
         if (loadedPlayersCount >= totalPlayersToLoad)
         {
             processAllPlayerStats();
-            setupConnections(); // Восстанавливаем соединение
+            setupConnections();
         }
         return;
     }
@@ -171,6 +145,7 @@ void MatchWindow::onPlayerStatsLoaded(QNetworkReply *reply)
             if (root.contains("segments") && root["segments"].isArray())
             {
                 QJsonArray segments = root["segments"].toArray();
+                bool statsFound = false;
 
                 for (const QJsonValue &segmentValue : segments)
                 {
@@ -184,17 +159,25 @@ void MatchWindow::onPlayerStatsLoaded(QNetworkReply *reply)
                         PlayerStats &playerStats = playerStatsMap[playerId];
 
                         playerStats.matches = stats.contains("Total Matches") ?
-                            stats["Total Matches"].toString().toInt() : 0;
+                                                  stats["Total Matches"].toString().toInt() : 0;
                         playerStats.kdRatio = stats.contains("Average K/D Ratio") ?
-                            stats["Average K/D Ratio"].toString().toDouble() : 0.0;
+                                                  stats["Average K/D Ratio"].toString().toDouble() : 0.0;
                         playerStats.avgKills = stats.contains("Average Kills") ?
-                            stats["Average Kills"].toString().toDouble() : 0.0;
+                                                   stats["Average Kills"].toString().toDouble() : 0.0;
                         playerStats.winRate = stats.contains("Win Rate %") ?
-                            stats["Win Rate %"].toString().toDouble() : 0.0;
+                                                  stats["Win Rate %"].toString().toDouble() : 0.0;
                         playerStats.loaded = true;
+                        statsFound = true;
 
+                        qDebug() << "Stats loaded for" << playerStats.nickname << "on" << currentMapName
+                                 << "Matches:" << playerStats.matches << "KD:" << playerStats.kdRatio;
                         break;
                     }
+                }
+
+                if (!statsFound) {
+                    qDebug() << "No stats found for" << playerStatsMap[playerId].nickname << "on map" << currentMapName;
+                    playerStatsMap[playerId].loaded = true;
                 }
             }
         }
@@ -203,10 +186,11 @@ void MatchWindow::onPlayerStatsLoaded(QNetworkReply *reply)
     loadedPlayersCount++;
     progressBar->setValue(loadedPlayersCount);
 
+    // Когда все игроки загружены, обрабатываем и отображаем статистику
     if (loadedPlayersCount >= totalPlayersToLoad)
     {
         processAllPlayerStats();
-        setupConnections(); // Восстанавливаем соединение после завершения
+        setupConnections();
     }
 }
 
@@ -293,22 +277,22 @@ void MatchWindow::displayMatchInfo(const QJsonObject &matchData)
     totalPlayersToLoad = playerStatsMap.size();
 
     QString matchInfoText = QString(
-        "🎮 Информация о матче\n"
-        "🆔 %1\n"
-        "🗺️ Карта: %2\n"
-        "🏆 Турнир: %3\n"
-        "📊 Статус: %4\n\n"
-        "👥 Команды:\n"
-        "🔵 %5 (%6 игроков)\n"
-        "🔴 %7 (%8 игроков)")
-        .arg(matchId)
-        .arg(currentMapName)
-        .arg(competitionName)
-        .arg(status)
-        .arg(team1Name)
-        .arg(team1Players.size())
-        .arg(team2Name)
-        .arg(team2Players.size());
+                                "🎮 Информация о матче\n"
+                                "🆔 %1\n"
+                                "🗺️ Карта: %2\n"
+                                "🏆 Турнир: %3\n"
+                                "📊 Статус: %4\n\n"
+                                "👥 Команды:\n"
+                                "🔵 %5 (%6 игроков)\n"
+                                "🔴 %7 (%8 игроков)")
+                                .arg(matchId)
+                                .arg(currentMapName)
+                                .arg(competitionName)
+                                .arg(status)
+                                .arg(team1Name)
+                                .arg(team1Players.size())
+                                .arg(team2Name)
+                                .arg(team2Players.size());
 
     infoLabel->setText(matchInfoText);
 
@@ -339,7 +323,6 @@ void MatchWindow::displayMatchInfo(const QJsonObject &matchData)
     playerStatsLabel->setText(playersText);
 }
 
-
 void MatchWindow::fetchPlayerStats(const QString &playerId, const QString &nickname, const QString &mapName)
 {
     QString statsUrl = QString("https://open.faceit.com/data/v4/players/%1/stats/cs2").arg(playerId);
@@ -358,17 +341,23 @@ void MatchWindow::processAllPlayerStats()
     QString team1Stats = "🔵 " + team1Name + ":\n";
     QString team2Stats = "🔴 " + team2Name + ":\n";
 
+    bool hasStats = false;
+
     // Сортируем игроков по командам
     for (auto it = playerStatsMap.begin(); it != playerStatsMap.end(); ++it) {
         const QString &playerId = it.key();
         const PlayerStats &stats = it.value();
 
+        if (stats.matches > 0) {
+            hasStats = true;
+        }
+
         QString playerLine = QString("   %1 - M: %2 | KD: %3 | AVG.K: %4 | WR: %5%\n")
-            .arg(stats.nickname)
-            .arg(stats.matches)
-            .arg(stats.kdRatio, 0, 'f', 2)
-            .arg(stats.avgKills, 0, 'f', 1)
-            .arg(stats.winRate, 0, 'f', 1);
+                                 .arg(stats.nickname)
+                                 .arg(stats.matches)
+                                 .arg(stats.kdRatio, 0, 'f', 2)
+                                 .arg(stats.avgKills, 0, 'f', 1)
+                                 .arg(stats.winRate, 0, 'f', 1);
 
         if (playerTeamMap.contains(playerId)) {
             if (playerTeamMap[playerId] == team1Name) {
@@ -379,7 +368,13 @@ void MatchWindow::processAllPlayerStats()
         }
     }
 
-    statsText += team1Stats + "\n" + team2Stats;
+    if (!hasStats) {
+        statsText += "❌ Статистика на этой карте не найдена для игроков\n";
+        statsText += "Возможно, у игроков нет сыгранных матчей на карте " + currentMapName;
+    } else {
+        statsText += team1Stats + "\n" + team2Stats;
+    }
+
     playerStatsLabel->setText(statsText);
     progressBar->setVisible(false);
 }
@@ -403,7 +398,7 @@ void MatchWindow::setupUI()
         "    background-color: #4CAF50;"
         "    border-radius: 4px;"
         "}"
-    );
+        );
     setCentralWidget(centralWidget);
 
     mainLayout = new QVBoxLayout(centralWidget);
@@ -424,7 +419,7 @@ void MatchWindow::setupUI()
         "}"
         "QPushButton:hover { background-color: #45a049; }"
         "QPushButton:pressed { background-color: #3d8b40; }"
-    );
+        );
     connect(refreshButton, &QPushButton::clicked, this, [this]() {
         if (!currentMatchId.isEmpty()) {
             infoLabel->setText("Обновление...");
@@ -444,7 +439,7 @@ void MatchWindow::setupUI()
         "}"
         "QPushButton:hover { background-color: #da190b; }"
         "QPushButton:pressed { background-color: #a1150b; }"
-    );
+        );
     connect(backButton, &QPushButton::clicked, this, &MatchWindow::onBackButtonClicked);
 
     topLayout->addWidget(refreshButton);
@@ -456,7 +451,6 @@ void MatchWindow::setupUI()
     infoLabel->setAlignment(Qt::AlignLeft);
     infoLabel->setWordWrap(true);
 
-    // Progress bar для отображения прогресса загрузки
     progressBar = new QProgressBar(this);
     progressBar->setVisible(false);
     progressBar->setFixedHeight(20);
