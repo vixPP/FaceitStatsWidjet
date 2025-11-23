@@ -9,6 +9,7 @@
 #include <QLabel>
 #include <QNetworkReply>
 #include <QScrollArea>
+#include <QProgressBar>
 
 class MatchWindow : public QMainWindow
 {
@@ -24,12 +25,26 @@ private slots:
     void onBackButtonClicked();
     void onMatchDataLoaded(QNetworkReply *reply);
     void onMatchStatsLoaded(QNetworkReply *reply);
-    void debugJsonStructure(const QJsonObject &obj, const QString &prefix);
+    void onPlayerStatsLoaded(QNetworkReply *reply);
 
 private:
     void setupUI();
     void displayMatchInfo(const QJsonObject &matchData);
-    void displayPlayerStats(const QJsonObject &statsData);
+
+    void fetchPlayerStats(const QString &playerId, const QString &nickname, const QString &mapName);
+    void processAllPlayerStats();
+    void setupConnections();
+
+    struct PlayerStats
+    {
+        QString nickname;
+        QString playerId;
+        int matches = 0;
+        double kdRatio = 0.0;
+        double avgKills = 0.0;
+        double winRate = 0.0;
+        bool loaded = false;
+    };
 
     QWidget *centralWidget;
     QVBoxLayout *mainLayout;
@@ -37,11 +52,21 @@ private:
     QPushButton *refreshButton;
     QLabel *infoLabel;
     QLabel *playerStatsLabel;
+    QProgressBar *progressBar;
 
     QNetworkAccessManager *networkManager;
     QString apiKey;
     QString currentPlayerId;
     QString currentMatchId;
+    QString currentMapName;
+
+    QMap<QString, PlayerStats> playerStatsMap;
+    int totalPlayersToLoad = 0;
+    int loadedPlayersCount = 0;
+
+    QMap<QString, QString> playerTeamMap; // playerId -> teamName
+        QString team1Name;
+        QString team2Name;
 };
 
 #endif // MATCHWINDOW_H

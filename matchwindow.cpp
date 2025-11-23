@@ -9,9 +9,11 @@
 MatchWindow::MatchWindow(const QString &apiKey, QWidget *parent)
     : QMainWindow(parent)
     , apiKey(apiKey)
+    , team1Name("Команда 1")
+    , team2Name("Команда 2")
 {
     networkManager = new QNetworkAccessManager(this);
-    connect(networkManager, &QNetworkAccessManager::finished, this, &MatchWindow::onMatchDataLoaded);
+    setupConnections(); // Используем функцию для настройки соединений
 
     setupUI();
 
@@ -21,10 +23,24 @@ MatchWindow::MatchWindow(const QString &apiKey, QWidget *parent)
     move(1020, 440);
 }
 
+// Новая функция для настройки соединений
+void MatchWindow::setupConnections()
+{
+    disconnect(networkManager, &QNetworkAccessManager::finished, this, nullptr);
+    connect(networkManager, &QNetworkAccessManager::finished, this, &MatchWindow::onMatchDataLoaded);
+}
+
 void MatchWindow::loadMatchById(const QString &matchId, const QString &playerId)
 {
     currentMatchId = matchId;
     currentPlayerId = playerId;
+    playerStatsMap.clear();
+    playerTeamMap.clear();
+    loadedPlayersCount = 0;
+    totalPlayersToLoad = 0;
+
+    // Сбрасываем соединения к начальному состоянию
+    setupConnections();
 
     QString url = QString("https://open.faceit.com/data/v4/matches/%1").arg(matchId);
     QNetworkRequest request;
@@ -34,11 +50,14 @@ void MatchWindow::loadMatchById(const QString &matchId, const QString &playerId)
 
     networkManager->get(request);
     infoLabel->setText("Загрузка информации о матче...");
+    progressBar->setValue(0);
+    progressBar->setVisible(false);
 }
 
 void MatchWindow::onMatchDataLoaded(QNetworkReply *reply)
 {
-    if (reply->error() != QNetworkReply::NoError) {
+    if (reply->error() != QNetworkReply::NoError)
+    {
         qDebug() << "Match data error:" << reply->errorString();
         infoLabel->setText("Ошибка загрузки матча: " + reply->errorString());
         reply->deleteLater();
@@ -49,16 +68,14 @@ void MatchWindow::onMatchDataLoaded(QNetworkReply *reply)
     QJsonDocument jsonDoc = QJsonDocument::fromJson(responseData);
     reply->deleteLater();
 
-    if (jsonDoc.isNull() || !jsonDoc.isObject()) {
+    if (jsonDoc.isNull() || !jsonDoc.isObject())
+    {
         infoLabel->setText("Ошибка: некорректные данные матча");
         return;
     }
 
     QJsonObject matchData = jsonDoc.object();
     displayMatchInfo(matchData);
-    qDebug() << "=== DEBUG JSON STRUCTURE ===";
-    debugJsonStructure(matchData, "");
-    qDebug() << "=== END DEBUG ===";
 
     if (!currentMatchId.isEmpty())
     {
@@ -67,6 +84,7 @@ void MatchWindow::onMatchDataLoaded(QNetworkReply *reply)
         statsRequest.setUrl(QUrl(statsUrl));
         statsRequest.setRawHeader("Authorization", QString("Bearer %1").arg(apiKey).toUtf8());
 
+        // Меняем соединение для загрузки статистики матча
         disconnect(networkManager, &QNetworkAccessManager::finished, this, &MatchWindow::onMatchDataLoaded);
         connect(networkManager, &QNetworkAccessManager::finished, this, &MatchWindow::onMatchStatsLoaded);
 
@@ -76,10 +94,14 @@ void MatchWindow::onMatchDataLoaded(QNetworkReply *reply)
 
 void MatchWindow::onMatchStatsLoaded(QNetworkReply *reply)
 {
-    if (reply->error() != QNetworkReply::NoError) {
+    if (reply->error() != QNetworkReply::NoError)
+    {
         qDebug() << "Match stats error:" << reply->errorString();
         playerStatsLabel->setText(playerStatsLabel->text() + "\n\n❌ Ошибка загрузки статистики");
         reply->deleteLater();
+
+        // Восстанавливаем соединение даже при ошибке
+        setupConnections();
         return;
     }
 
@@ -87,12 +109,105 @@ void MatchWindow::onMatchStatsLoaded(QNetworkReply *reply)
     QJsonDocument jsonDoc = QJsonDocument::fromJson(responseData);
     reply->deleteLater();
 
-    if (!jsonDoc.isNull() && jsonDoc.isObject()) {
-        displayPlayerStats(jsonDoc.object());
+    // Начинаем загрузку статистики игроков на этой карте
+    if (!currentMapName.isEmpty() && !playerStatsMap.isEmpty())
+    {
+        // Меняем соединение для загрузки статистики игроков
+        disconnect(networkManager, &QNetworkAccessManager::finished, this, &MatchWindow::onMatchStatsLoaded);
+        connect(networkManager, &QNetworkAccessManager::finished, this, &MatchWindow::onPlayerStatsLoaded);
+
+        // Загружаем статистику для каждого игрока
+        loadedPlayersCount = 0; // Сбрасываем счетчик
+        for (auto it = playerStatsMap.begin(); it != playerStatsMap.end(); ++it)
+        {
+            fetchPlayerStats(it.key(), it.value().nickname, currentMapName);
+        }
+
+        progressBar->setVisible(true);
+        progressBar->setMaximum(playerStatsMap.size());
+        progressBar->setValue(0);
+    } else
+    {
+        // Если нет карты или игроков, восстанавливаем соединение
+        setupConnections();
+    }
+}
+
+void MatchWindow::onPlayerStatsLoaded(QNetworkReply *reply)
+{
+    if (reply->error() != QNetworkReply::NoError)
+    {
+        qDebug() << "Player stats error:" << reply->errorString();
+        loadedPlayersCount++; // Все равно увеличиваем счетчик
+        progressBar->setValue(loadedPlayersCount);
+        reply->deleteLater();
+
+        // Проверяем, все ли загружено
+        if (loadedPlayersCount >= totalPlayersToLoad)
+        {
+            processAllPlayerStats();
+            setupConnections(); // Восстанавливаем соединение
+        }
+        return;
     }
 
-    disconnect(networkManager, &QNetworkAccessManager::finished, this, &MatchWindow::onMatchStatsLoaded);
-    connect(networkManager, &QNetworkAccessManager::finished, this, &MatchWindow::onMatchDataLoaded);
+    QByteArray responseData = reply->readAll();
+    QJsonDocument jsonDoc = QJsonDocument::fromJson(responseData);
+    reply->deleteLater();
+
+    // Получаем playerId из URL
+    QString url = reply->url().toString();
+    QRegularExpression regex("players/([a-f0-9-]+)/stats");
+    QRegularExpressionMatch match = regex.match(url);
+
+    if (match.hasMatch())
+    {
+        QString playerId = match.captured(1);
+
+        if (playerStatsMap.contains(playerId) && !jsonDoc.isNull() && jsonDoc.isObject())
+        {
+            QJsonObject root = jsonDoc.object();
+
+            if (root.contains("segments") && root["segments"].isArray())
+            {
+                QJsonArray segments = root["segments"].toArray();
+
+                for (const QJsonValue &segmentValue : segments)
+                {
+                    if (!segmentValue.isObject()) continue;
+                    QJsonObject segment = segmentValue.toObject();
+
+                    if (segment["type"].toString() == "Map" &&
+                        segment["label"].toString().compare(currentMapName, Qt::CaseInsensitive) == 0) {
+
+                        QJsonObject stats = segment["stats"].toObject();
+                        PlayerStats &playerStats = playerStatsMap[playerId];
+
+                        playerStats.matches = stats.contains("Total Matches") ?
+                            stats["Total Matches"].toString().toInt() : 0;
+                        playerStats.kdRatio = stats.contains("Average K/D Ratio") ?
+                            stats["Average K/D Ratio"].toString().toDouble() : 0.0;
+                        playerStats.avgKills = stats.contains("Average Kills") ?
+                            stats["Average Kills"].toString().toDouble() : 0.0;
+                        playerStats.winRate = stats.contains("Win Rate %") ?
+                            stats["Win Rate %"].toString().toDouble() : 0.0;
+                        playerStats.loaded = true;
+
+                        break;
+                    }
+                }
+            }
+        }
+    }
+
+    loadedPlayersCount++;
+    progressBar->setValue(loadedPlayersCount);
+
+    if (loadedPlayersCount >= totalPlayersToLoad)
+    {
+        processAllPlayerStats();
+        setupConnections(); // Восстанавливаем соединение после завершения
+    }
 }
 
 void MatchWindow::displayMatchInfo(const QJsonObject &matchData)
@@ -102,14 +217,14 @@ void MatchWindow::displayMatchInfo(const QJsonObject &matchData)
     QString status = matchData["status"].toString("Неизвестно");
 
     QJsonObject teams = matchData["teams"].toObject();
-    QString team1Name = teams["faction1"].toObject()["name"].toString("Команда 1");
-    QString team2Name = teams["faction2"].toObject()["name"].toString("Команда 2");
+    team1Name = teams["faction1"].toObject()["name"].toString("Команда 1");
+    team2Name = teams["faction2"].toObject()["name"].toString("Команда 2");
 
     QJsonArray team1Players = teams["faction1"].toObject()["roster"].toArray();
     QJsonArray team2Players = teams["faction2"].toObject()["roster"].toArray();
 
-    // ИСПРАВЛЕННОЕ получение названия карты
-    QString mapName = "Неизвестно";
+    // Получение названия карты
+    currentMapName = "Неизвестно";
 
     if (matchData.contains("voting") && matchData["voting"].isObject())
     {
@@ -118,22 +233,22 @@ void MatchWindow::displayMatchInfo(const QJsonObject &matchData)
         {
             QJsonObject mapVoting = voting["map"].toObject();
 
-            // Получаем выбранную карту (GUID) из pick
             if (mapVoting.contains("pick") && mapVoting["pick"].isArray())
             {
                 QJsonArray picks = mapVoting["pick"].toArray();
                 if (!picks.isEmpty()) {
                     QString selectedMapGuid = picks.first().toString();
 
-                    // Теперь ищем название карты по GUID в entities
                     if (mapVoting.contains("entities") && mapVoting["entities"].isArray())
                     {
                         QJsonArray entities = mapVoting["entities"].toArray();
-                        for (const QJsonValue &entityValue : entities) {
+                        for (const QJsonValue &entityValue : entities)
+                        {
                             QJsonObject entity = entityValue.toObject();
                             QString guid = entity["guid"].toString();
-                            if (guid == selectedMapGuid) {
-                                mapName = entity["name"].toString("Неизвестно");
+                            if (guid == selectedMapGuid)
+                            {
+                                currentMapName = entity["name"].toString("Неизвестно");
                                 break;
                             }
                         }
@@ -143,8 +258,39 @@ void MatchWindow::displayMatchInfo(const QJsonObject &matchData)
         }
     }
 
-    // Для отладки
-    qDebug() << "Selected map:" << mapName;
+    // Сохраняем информацию об игроках и их командах
+    playerStatsMap.clear();
+    playerTeamMap.clear();
+
+    // Команда 1
+    for (const QJsonValue &playerValue : team1Players)
+    {
+        QJsonObject player = playerValue.toObject();
+        QString nickname = player["nickname"].toString("Unknown");
+        QString playerId = player["player_id"].toString();
+
+        PlayerStats stats;
+        stats.nickname = nickname;
+        stats.playerId = playerId;
+        playerStatsMap[playerId] = stats;
+        playerTeamMap[playerId] = team1Name;
+    }
+
+    // Команда 2
+    for (const QJsonValue &playerValue : team2Players)
+    {
+        QJsonObject player = playerValue.toObject();
+        QString nickname = player["nickname"].toString("Unknown");
+        QString playerId = player["player_id"].toString();
+
+        PlayerStats stats;
+        stats.nickname = nickname;
+        stats.playerId = playerId;
+        playerStatsMap[playerId] = stats;
+        playerTeamMap[playerId] = team2Name;
+    }
+
+    totalPlayersToLoad = playerStatsMap.size();
 
     QString matchInfoText = QString(
         "🎮 Информация о матче\n"
@@ -156,7 +302,7 @@ void MatchWindow::displayMatchInfo(const QJsonObject &matchData)
         "🔵 %5 (%6 игроков)\n"
         "🔴 %7 (%8 игроков)")
         .arg(matchId)
-        .arg(mapName)
+        .arg(currentMapName)
         .arg(competitionName)
         .arg(status)
         .arg(team1Name)
@@ -166,10 +312,12 @@ void MatchWindow::displayMatchInfo(const QJsonObject &matchData)
 
     infoLabel->setText(matchInfoText);
 
+    // Показываем начальную информацию об игроках
     QString playersText = "Список игроков:\n\n";
 
     playersText += "🔵 " + team1Name + ":\n";
-    for (const QJsonValue &playerValue : team1Players) {
+    for (const QJsonValue &playerValue : team1Players)
+    {
         QJsonObject player = playerValue.toObject();
         QString nickname = player["nickname"].toString("Unknown");
         QString playerId = player["player_id"].toString();
@@ -178,7 +326,8 @@ void MatchWindow::displayMatchInfo(const QJsonObject &matchData)
     }
 
     playersText += "\n🔴 " + team2Name + ":\n";
-    for (const QJsonValue &playerValue : team2Players) {
+    for (const QJsonValue &playerValue : team2Players)
+    {
         QJsonObject player = playerValue.toObject();
         QString nickname = player["nickname"].toString("Unknown");
         QString playerId = player["player_id"].toString();
@@ -186,12 +335,53 @@ void MatchWindow::displayMatchInfo(const QJsonObject &matchData)
         playersText += QString("   %1%2\n").arg(nickname).arg(isCurrent ? " (ТЫ)" : "");
     }
 
+    playersText += "\n\n📊 Загрузка статистики игроков на карте " + currentMapName + "...";
     playerStatsLabel->setText(playersText);
 }
 
-void MatchWindow::displayPlayerStats(const QJsonObject &statsData)
+
+void MatchWindow::fetchPlayerStats(const QString &playerId, const QString &nickname, const QString &mapName)
 {
-    playerStatsLabel->setText(playerStatsLabel->text() + "\n\n✅ Статистика загружена");
+    QString statsUrl = QString("https://open.faceit.com/data/v4/players/%1/stats/cs2").arg(playerId);
+    QNetworkRequest request;
+    request.setUrl(QUrl(statsUrl));
+    request.setRawHeader("Authorization", QString("Bearer %1").arg(apiKey).toUtf8());
+    request.setRawHeader("Accept", "application/json");
+
+    networkManager->get(request);
+}
+
+void MatchWindow::processAllPlayerStats()
+{
+    QString statsText = "📊 Статистика игроков на карте " + currentMapName + ":\n\n";
+
+    QString team1Stats = "🔵 " + team1Name + ":\n";
+    QString team2Stats = "🔴 " + team2Name + ":\n";
+
+    // Сортируем игроков по командам
+    for (auto it = playerStatsMap.begin(); it != playerStatsMap.end(); ++it) {
+        const QString &playerId = it.key();
+        const PlayerStats &stats = it.value();
+
+        QString playerLine = QString("   %1 - M: %2 | KD: %3 | AVG.K: %4 | WR: %5%\n")
+            .arg(stats.nickname)
+            .arg(stats.matches)
+            .arg(stats.kdRatio, 0, 'f', 2)
+            .arg(stats.avgKills, 0, 'f', 1)
+            .arg(stats.winRate, 0, 'f', 1);
+
+        if (playerTeamMap.contains(playerId)) {
+            if (playerTeamMap[playerId] == team1Name) {
+                team1Stats += playerLine;
+            } else {
+                team2Stats += playerLine;
+            }
+        }
+    }
+
+    statsText += team1Stats + "\n" + team2Stats;
+    playerStatsLabel->setText(statsText);
+    progressBar->setVisible(false);
 }
 
 void MatchWindow::setupUI()
@@ -202,6 +392,16 @@ void MatchWindow::setupUI()
         "    background-color: #2e2e2d;"
         "    border: 2px solid #4CAF50;"
         "    border-radius: 10px;"
+        "}"
+        "QProgressBar {"
+        "    border: 1px solid #4CAF50;"
+        "    border-radius: 5px;"
+        "    text-align: center;"
+        "    color: white;"
+        "}"
+        "QProgressBar::chunk {"
+        "    background-color: #4CAF50;"
+        "    border-radius: 4px;"
         "}"
     );
     setCentralWidget(centralWidget);
@@ -256,6 +456,13 @@ void MatchWindow::setupUI()
     infoLabel->setAlignment(Qt::AlignLeft);
     infoLabel->setWordWrap(true);
 
+    // Progress bar для отображения прогресса загрузки
+    progressBar = new QProgressBar(this);
+    progressBar->setVisible(false);
+    progressBar->setFixedHeight(20);
+    progressBar->setTextVisible(true);
+    progressBar->setFormat("Загрузка статистики: %p%");
+
     playerStatsLabel = new QLabel("Информация о игроках появится здесь", this);
     playerStatsLabel->setStyleSheet("font-size: 11px; color: #cccccc;");
     playerStatsLabel->setAlignment(Qt::AlignLeft);
@@ -272,28 +479,9 @@ void MatchWindow::setupUI()
 
     mainLayout->addLayout(topLayout);
     mainLayout->addWidget(infoLabel);
+    mainLayout->addWidget(progressBar);
     mainLayout->addWidget(scrollArea);
 }
-
-void MatchWindow::debugJsonStructure(const QJsonObject &obj, const QString &prefix)
-{
-    for (auto it = obj.begin(); it != obj.end(); ++it) {
-        QString key = it.key();
-        QJsonValue value = it.value();
-
-        qDebug() << prefix << key << ":";
-
-        if (value.isObject()) {
-            debugJsonStructure(value.toObject(), prefix + "  ");
-        } else if (value.isArray()) {
-            qDebug() << prefix << "  [Array]";
-        } else {
-            qDebug() << prefix << "  " << value.toString();
-        }
-    }
-}
-
-
 
 void MatchWindow::onBackButtonClicked()
 {
