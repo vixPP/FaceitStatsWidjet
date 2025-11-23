@@ -390,13 +390,30 @@ void MainWindow::onMatchHistoryFinished(QNetworkReply *reply)
         }
 
         if (!bestMap.isEmpty())
-        {
-            ui->text_BestMapName->setText(QString("%1").arg(bestMap));
-            ui->Text_KD_BestMap->setText(QString("KD:      %2").arg(bestKDRatio, 0, 'f', 2));
-            ui->Text_AVGK_BestMap->setText(QString("AVG.K:   %1").arg(AVGK, 0, 'f', 1));
-            ui->TotalOnBestMapMatches->setText(QString("Matches: %1").arg(TotalMatches));
-            ui->Text_WInRate_BestMap->setText(QString("W.Rate:  %1%").arg(winRate, 0, 'f', 1)); // ДОБАВЬТЕ % В ВЫВОД
-        }
+            {
+                ui->text_BestMapName->setText(QString("%1").arg(bestMap));
+                ui->Text_KD_BestMap->setText(QString("KD:      %2").arg(bestKDRatio, 0, 'f', 2));
+                ui->Text_AVGK_BestMap->setText(QString("AVG.K:   %1").arg(AVGK, 0, 'f', 1));
+                ui->TotalOnBestMapMatches->setText(QString("Matches: %1").arg(TotalMatches));
+                ui->Text_WInRate_BestMap->setText(QString("W.Rate:  %1%").arg(winRate, 0, 'f', 1));
+
+                if (!bestMapImageUrl.isEmpty())
+                {
+                    QNetworkRequest imageRequest;
+                    imageRequest.setUrl(QUrl(bestMapImageUrl));
+                    bestMapImageNetworkManager->get(imageRequest);
+                    qDebug() << "Загружаем изображение карты:" << bestMapImageUrl;
+                }
+                else
+                {
+                    qDebug() << "URL изображения карты пуст";
+                    bestMapImageLabel->clear(); // Очищаем label если нет изображения
+                }
+            }
+            else
+            {
+                bestMapImageLabel->clear(); // Очищаем label если нет лучшей карты
+            }
     }
 
     if (root.contains("lifetime") && root["lifetime"].isObject())
@@ -489,7 +506,7 @@ void MainWindow::onMatchHistoryFetched(QNetworkReply *reply)
                 qDebug() << "Матч для ELO (последний доступный):" << eloMatchId;
             }
 
-            for (const QJsonValue &matchValue : matches)
+            for (const QJsonValue &matchValue : qAsConst(matches))
             {
                 if (!matchValue.isObject()) continue;
                 QJsonObject match = matchValue.toObject();
